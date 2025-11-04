@@ -65,7 +65,7 @@ class JenaPayPayIn(APIView):
             data = request.data.get('data')
             amount = data.get('amount')
             userToken = data.get('userToken')
-            userId = data.get('userId')
+            brokesrUserId = data.get('brokesrUserId')
 
             
             amount = str(amount) + '.00'
@@ -105,6 +105,7 @@ class JenaPayPayIn(APIView):
             
             url = JENA_PAY_PAYIN_URL
             resp = requests.post(url, headers=headers, json=payload)
+            print(resp.text, "-------------------150")
             
             if resp.status_code != 200:
                 response['status'] = "error"
@@ -117,29 +118,31 @@ class JenaPayPayIn(APIView):
             if "redirect_url" in data:
                 data["cashierLink"] = data.pop("redirect_url")
 
-            headers = {
+            header = {
                 "Content-Type": "application/json",
                 "x-crm-api-token": "c6420f81-d146-44c1-807c-2462f9210361"
             }
 
             payload = {
-                "brokerUserId": userId,
+                "brokerUserId": brokesrUserId,
                 "amount": int(float(amount)),
                 "method": "Crypto",
                 "comment": "Deposit for Trading Account",
                 "commentForUser": "Deposit for Trading Account",
-                "pspId": 2,
+                "pspId": 1,
                 "pspTransactionId": order.get('number'),
                 "status": "Pending",
                 "normalizedAmount": int(float(amount)),
                 "decisionTime": 0,
                 "declineReason": "string",
-                "brandExternalId": "string"
+                "brandExternalId": order.get('number')
             }
 
+            crmRes = requests.post("https://apicrm.sgfx.com/SignalsCRM//crm-api/brokers/bankings/deposit/manual", json=payload, headers=header).json()
 
+            if crmRes['result']['success']:
+                response['result'] = {"data":data, "crmRes": crmRes}
 
-            response['result'] = {"data":data}
             return Response(response, status=status.HTTP_200_OK)
 
         except Exception as e:
@@ -166,7 +169,40 @@ class JenaPayPayInCallBack(APIView):
  
             try:
                 with transaction.atomic():
-                    pass
+                    cursor = connection.cursor(dictionary=True)
+
+                    query = """
+                        SELECT bb.* 
+                        FROM crmdb.broker_banking AS bb 
+                        WHERE bb.psp_transaction_id = %s
+                    """
+
+                    params = (str(order_number))
+
+                    cursor.execute(query, params)
+                    row = cursor.fetchone()
+
+                    if row:
+                        brokerBankingId = row['id']
+
+                    payload = {
+                        "brokerBankingId": brokerBankingId,
+                        "method" : "Crypto",
+                        "comment": "Deposit for Trading Account Approved",
+                        "pspTransactionId" : str(order_number),
+                        "decisionTime" : datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    }
+
+                    header = {
+                        "Content-Type": "application/json",
+                        "x-crm-api-token": "c6420f81-d146-44c1-807c-2462f9210361"
+                    }
+
+                    crmRes = requests.post("https://apicrm.sgfx.com/SignalsCRM//crm-api/brokers/bankings/deposit/approve", json=payload, headers=header).json()
+
+
+                    if crmRes['result']['success']:
+                        return Response({"code": "200", "msg": "success"}, status=status.HTTP_200_OK)
 
             except Exception as e:
                 return Response(f"Error in Transaction: {str(e)}")
@@ -238,7 +274,7 @@ class CheezeePayUPIPayIN(APIView):
                     "pspId": 1,
                     "pspTransactionId": payload.get('mchOrderNo'),
                     "status": "Pending",
-                    "normalizedAmount": 0,
+                    "normalizedAmount": int(amount),
                     "decisionTime": 0,
                     "declineReason": "string",
                     "brandExternalId": payload.get('mchOrderNo')
@@ -323,7 +359,7 @@ class CheezeePayInCallBackWebhook(APIView):
                         "brokerBankingId": brokerBankingId,
                         "method" : "Crypto",
                         "comment": "Deposit for Trading Account Approved",
-                        "pspTransactionId" : mchOrderNo,
+                        "pspTransactionId" : str(mchOrderNo),
                         "decisionTime" : datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     }
 
@@ -351,6 +387,8 @@ class CheezeePayInCallBackWebhook(APIView):
             response['httpstatus'] = status.HTTP_400_BAD_REQUEST
             return Response(response, status=response.get('httpstatus'))
         
+
+
 
 class CheezeePayUPIPayOut(APIView):
 
@@ -397,52 +435,52 @@ class CheezeePayUPIPayOut(APIView):
         
 
 
-class CheezeePayCryptoPayIn(APIView):
-    def post(self, request):
-        try:
+# class CheezeePayCryptoPayIn(APIView):
+#     def post(self, request):
+#         try:
             
-            response = {"status":"success", "errorcode": "", "result":"", "reason": "", "httpstatus": status.HTTP_200_OK}
+#             response = {"status":"success", "errorcode": "", "result":"", "reason": "", "httpstatus": status.HTTP_200_OK}
 
-            data = request.data.get('data')
-            amount = data.get('amount')
-            # Step 2: Prepare payload for Cheezee Pay
-            payload = {
-                "customerMerchantsId": os.environ.get('CHEEZEE_PAY_CRYPTO_CUSTOMER_ID'),
-                "merchantsId": os.environ.get('CHEEZEE_PAY_CRYPTO_MERCHANT_ID'),
-                "chargeMoney": str(amount),   # amount from DB
-                "moneyUnit": "USDT",
-                "merchantsOrderId": str(uuid.uuid4()).replace("-",''),  # your order ID
-                "netWork": "TRC20",
-                "orderVersion": "v1.0",
-                "timestamp": str(int(time.time() * 1000)),
-            }
-            payload["platSign"] = get_sign(payload, CryptoPrivateKey)
+#             data = request.data.get('data')
+#             amount = data.get('amount')
+#             # Step 2: Prepare payload for Cheezee Pay
+#             payload = {
+#                 "customerMerchantsId": os.environ.get('CHEEZEE_PAY_CRYPTO_CUSTOMER_ID'),
+#                 "merchantsId": os.environ.get('CHEEZEE_PAY_CRYPTO_MERCHANT_ID'),
+#                 "chargeMoney": str(amount),   # amount from DB
+#                 "moneyUnit": "USDT",
+#                 "merchantsOrderId": str(uuid.uuid4()).replace("-",''),  # your order ID
+#                 "netWork": "TRC20",
+#                 "orderVersion": "v1.0",
+#                 "timestamp": str(int(time.time() * 1000)),
+#             }
+#             payload["platSign"] = get_sign(payload, CryptoPrivateKey)
 
-            # Step 3: Call Cheezee Pay API (sandbox domain for testing)
-            url = "https://test2-openapi.91fafafa.com/api/business/createCollectionOrder"
-            resp = requests.post(url, json=payload, headers=headers).json()
+#             # Step 3: Call Cheezee Pay API (sandbox domain for testing)
+#             url = "https://test2-openapi.91fafafa.com/api/business/createCollectionOrder"
+#             resp = requests.post(url, json=payload, headers=headers).json()
 
-            print(resp)
-            # Step 4: Verify response and return to frontend
-            if resp.get("code") == "000000":
-                print(resp)
-                if verify_sign(resp, CryptoPublickey):
+#             print(resp)
+#             # Step 4: Verify response and return to frontend
+#             if resp.get("code") == "000000":
+#                 print(resp)
+#                 if verify_sign(resp, CryptoPublickey):
 
-                    response['result'] = {
-                        "data":resp
-                    }
-                    return Response(response, status=response.get('httpstatus'))
+#                     response['result'] = {
+#                         "data":resp
+#                     }
+#                     return Response(response, status=response.get('httpstatus'))
 
-            response['status'] = 'error'
-            response['errorcode'] = status.HTTP_400_BAD_REQUEST
-            response['reason'] = 'Error Crypto Deposit!!'
-            response['httpstatus'] = status.HTTP_400_BAD_REQUEST
-            return Response(response, status=response.get('httpstatus'))
+#             response['status'] = 'error'
+#             response['errorcode'] = status.HTTP_400_BAD_REQUEST
+#             response['reason'] = 'Error Crypto Deposit!!'
+#             response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+#             return Response(response, status=response.get('httpstatus'))
 
-        except Exception as e:
-            print(f"Error in CreateCryptoPayin: {str(e)}")
-            response['status'] = 'error'
-            response['errorcode'] = status.HTTP_400_BAD_REQUEST
-            response['reason'] = str(e)
-            response['httpstatus'] = status.HTTP_400_BAD_REQUEST
-            return Response(response, status=response.get('httpstatus'))
+#         except Exception as e:
+#             print(f"Error in CreateCryptoPayin: {str(e)}")
+#             response['status'] = 'error'
+#             response['errorcode'] = status.HTTP_400_BAD_REQUEST
+#             response['reason'] = str(e)
+#             response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+#             return Response(response, status=response.get('httpstatus'))
