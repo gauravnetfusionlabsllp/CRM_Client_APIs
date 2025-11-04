@@ -1,0 +1,45 @@
+# Virtual environments
+.env/
+.venv/
+mt_env/
+d_env/
+
+# Environment variable files
+.env
+
+# Python cache / compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE and editor settings
+.vscode/
+.idea/
+
+# Logs
+*.log
+*.error_logs
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+
+# Database
+db.sqlite3
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Ignore all migrations except __init__.py
+**/migrations/*
+!**/migrations/__init__.py
+
+# Optional: coverage, build, and temp files
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Ignore all .dat files
+*.dat
