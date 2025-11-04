@@ -35,6 +35,24 @@ CORS_ALLOW_ALL_ORIGINS = True
 
 CORS_ALLOW_CREDENTIALS = True
 
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+    'user',
+    'activeId',
+    'user_id',   
+    'auth-token',  
+    'Auth_token' 
+]
+
+
 CSRF_COOKIE_NAME = 'csrftoken'
 CSRF_COOKIE_AGE = 86400
 CSRF_COOKIE_SAMESITE = 'Lax'
