@@ -64,13 +64,48 @@ class JenaPayPayIn(APIView):
 
             data = request.data.get('data')
             amount = data.get('amount')
-            userToken = data.get('userToken')
-            userId = data.get('userId')
+            authToken = data.get('Auth-Token')
+            brokesrUserId = data.get('brokesrUserId')
 
-            
+            cursor = connection.cursor(dictionary=True)
+
+            query = """
+                SELECT 
+                    u.full_name, 
+                    u.email, 
+                    u.id AS user_id
+                FROM crmdb.auth_tokens AS t
+                JOIN crmdb.users AS u 
+                    ON u.id = t.user_id
+                WHERE 
+                    t.auth_token = %s
+                    AND t.user_id IS NOT NULL
+            """
+
+            params = (str(authToken),)
+            cursor.execute(query, params)
+            userData = cursor.fetchone()
+
+            if not userData:
+                response['status'] = 'error'
+                response['errorcode'] = status.HTTP_401_UNAUTHORIZED
+                response['reason'] = "User Deatils Not Found!"
+                response['httpstatus'] = status.HTTP_401_UNAUTHORIZED
+                return Response(response, status=response.get('httpstatus'))
+
+            ordRec = OrderDetails.objects.create(
+                userId = str(userData.get('user_id')),
+                full_name = str(userData.get('full_name')),
+                email = str(userData.get('email')),
+                brokerUserId = str(brokesrUserId),
+                amount = amount
+            )
+
+            # if userIdData:
+
             amount = str(amount) + '.00'
             order = {
-                "number": str(uuid.uuid4()).replace('-',''),
+                "number": str(ordRec.orderId).replace('-',''),
                 "amount": str(amount),
                 "currency": "USD",
                 "description": "Amount for the Trading"
@@ -90,8 +125,8 @@ class JenaPayPayIn(APIView):
                 "error_url": JENA_PAY_ERROR_URL,
                 "url_target": "_blank",
                 "customer":{
-                    "name": str('Testing'),
-                    "email": str('test1@gmail.com')
+                    "name": ordRec.full_name,
+                    "email": ordRec.email
                 },
                 "req_token": False,
                 "hash": signature,
@@ -117,29 +152,32 @@ class JenaPayPayIn(APIView):
             if "redirect_url" in data:
                 data["cashierLink"] = data.pop("redirect_url")
 
-            headers = {
-                "Content-Type": "application/json",
-                "x-crm-api-token": "c6420f81-d146-44c1-807c-2462f9210361"
-            }
+            # header = {
+            #     "Content-Type": "application/json",
+            #     "x-crm-api-token": "c6420f81-d146-44c1-807c-2462f9210361"
+            # }
 
-            payload = {
-                "brokerUserId": userId,
-                "amount": int(float(amount)),
-                "method": "Crypto",
-                "comment": "Deposit for Trading Account",
-                "commentForUser": "Deposit for Trading Account",
-                "pspId": 2,
-                "pspTransactionId": order.get('number'),
-                "status": "Pending",
-                "normalizedAmount": int(float(amount)),
-                "decisionTime": 0,
-                "declineReason": "string",
-                "brandExternalId": "string"
-            }
+            # payload = {
+            #     "brokerUserId": brokesrUserId,
+            #     "amount": int(float(amount)),
+            #     "method": "Crypto",
+            #     "comment": "Deposit for Trading Account",
+            #     "commentForUser": "Deposit for Trading Account",
+            #     "pspId": 1,
+            #     "pspTransactionId": order.get('number'),
+            #     "status": "Pending",
+            #     "normalizedAmount": int(float(amount)),
+            #     "decisionTime": 0,
+            #     "declineReason": "string",
+            #     "brandExternalId": order.get('number')
+            # }
 
+            # crmRes = requests.post("https://apicrm.sgfx.com/SignalsCRM//crm-api/brokers/bankings/deposit/manual", json=payload, headers=header).json()
 
+            # if crmRes['result']['success']:
+            ordRec.save()
+            response['result'] = {"data":data, "crmRes": "None"}
 
-            response['result'] = {"data":data}
             return Response(response, status=status.HTTP_200_OK)
 
         except Exception as e:
@@ -166,7 +204,45 @@ class JenaPayPayInCallBack(APIView):
  
             try:
                 with transaction.atomic():
-                    pass
+                    orderId = str(uuid.UUID(order_number))
+                    orderData = OrderDetails.objects.get(orderId = orderId)
+                    print(orderData, "---------------")
+
+                    if orderData.status != "SUCCESS":
+                        cursor = connection.cursor(dictionary=True)
+
+                        query = """
+                            SELECT bb.* 
+                            FROM crmdb.broker_banking AS bb 
+                            WHERE bb.psp_transaction_id = %s and bb.broker_user_id = %s and bb.user_id = %s
+                        """
+
+                        params = (str(order_number), orderData.brokerUserId, orderData.userId)
+
+                        cursor.execute(query, params)
+                        row = cursor.fetchone()
+
+                        # if row:
+                        #     brokerBankingId = row['id']
+
+                        # payload = {
+                        #     "brokerBankingId": brokerBankingId,
+                        #     "method" : "Crypto",
+                        #     "comment": "Deposit for Trading Account Approved",
+                        #     "pspTransactionId" : str(order_number),
+                        #     "decisionTime" : datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        # }
+
+                        # header = {
+                        #     "Content-Type": "application/json",
+                        #     "x-crm-api-token": "c6420f81-d146-44c1-807c-2462f9210361"
+                        # }
+
+                        # crmRes = requests.post("https://apicrm.sgfx.com/SignalsCRM//crm-api/brokers/bankings/deposit/approve", json=payload, headers=header).json()
+
+
+                    # if crmRes['result']['success']:
+                    return Response({"code": "200", "msg": "success"}, status=status.HTTP_200_OK)
 
             except Exception as e:
                 return Response(f"Error in Transaction: {str(e)}")
@@ -190,22 +266,57 @@ class CheezeePayUPIPayIN(APIView):
             response = {"status": "success", "errorcode": "", "reason": "", "result": "", "httpstatus": status.HTTP_200_OK}
             data = request.data.get('data')
             amount = data.get('amount')
-            userId = request.headers.get('HTTP_AUTH_TOKEN') or request.headers.get('Auth-Token')
+            authToken = data.get('Auth-Token')
             brokerUserId = data.get('brokerUserId')
-            print(brokerUserId)
+
+            cursor = connection.cursor(dictionary=True)
+
+            query = """
+                SELECT 
+                    u.full_name, 
+                    u.email, 
+                    u.id AS user_id
+                FROM crmdb.auth_tokens AS t
+                JOIN crmdb.users AS u 
+                    ON u.id = t.user_id
+                WHERE 
+                    t.auth_token = %s
+                    AND t.user_id IS NOT NULL
+            """
+
+            params = (str(authToken),)
+            cursor.execute(query, params)
+            userData = cursor.fetchone()
+
+            if not userData:
+                response['status'] = 'error'
+                response['errorcode'] = status.HTTP_401_UNAUTHORIZED
+                response['reason'] = "User Deatils Not Found!"
+                response['httpstatus'] = status.HTTP_401_UNAUTHORIZED
+                return Response(response, status=response.get('httpstatus'))
+            
+            ordRec = OrderDetails.objects.create(
+                userId = str(userData.get('user_id')),
+                full_name = str(userData.get('full_name')),
+                email = str(userData.get('email')),
+                brokerUserId = str(brokerUserId),
+                amount = amount,
+                pspName = "CheezeePay UPI"
+            )
+            
 
             payload = {
                 "appId": os.environ['CHEEZEE_PAY_APP_ID'],
                 "merchantId": os.environ['CHEEZEE_PAY_MERCHANT_ID'],
-                "mchOrderNo": str(uuid.uuid4()).replace("-", ''),
+                "mchOrderNo": str(ordRec.orderId).replace("-", ''),
                 "paymentMode": "P2P",
                 "amount": amount,
-                "name": "brijesh",
+                "name": str(ordRec.full_name),
                 "timestamp": str(int(time.time() * 1000)),
                 "notifyUrl": "https://trader.sgfx.com/sign-in",
                 "returnUrl": CHEEZEE_PAY_RETURN_URL,
                 "language": "en",
-                "email": "test@gmail.com",
+                "email": str(ordRec.email),
                 "phone": "+91986475216"
             }
 
@@ -223,7 +334,6 @@ class CheezeePayUPIPayIN(APIView):
             
             if verify_sign(resp.copy(), PlatformPublicKey):
                 
-                print(payload.get('mchOrderNo'), "-------------------------")
                 header = {
                     "Content-Type": "application/json",
                     "x-crm-api-token": "c6420f81-d146-44c1-807c-2462f9210361"
@@ -238,13 +348,15 @@ class CheezeePayUPIPayIN(APIView):
                     "pspId": 1,
                     "pspTransactionId": payload.get('mchOrderNo'),
                     "status": "Pending",
-                    "normalizedAmount": 0,
+                    "normalizedAmount": int(amount),
                     "decisionTime": 0,
-                    "declineReason": "string",
+                    "declineReason": "Error in Payment Check In.",
                     "brandExternalId": payload.get('mchOrderNo')
                 }
 
                 crmRes = requests.post("https://apicrm.sgfx.com/SignalsCRM//crm-api/brokers/bankings/deposit/manual", json=payload, headers=header).json()
+
+                print(crmRes,"p---------------------------")
 
                 if crmRes['result']['success']:
                     response['result'] = {
@@ -252,7 +364,7 @@ class CheezeePayUPIPayIN(APIView):
                         "crmAPI": crmRes
                     }
 
-                return Response(response, status=response.get('httpstatus'))
+                    return Response(response, status=response.get('httpstatus'))
         
             response['result'] = {
                 "data": resp
@@ -323,7 +435,7 @@ class CheezeePayInCallBackWebhook(APIView):
                         "brokerBankingId": brokerBankingId,
                         "method" : "Crypto",
                         "comment": "Deposit for Trading Account Approved",
-                        "pspTransactionId" : mchOrderNo,
+                        "pspTransactionId" : str(mchOrderNo),
                         "decisionTime" : datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     }
 
@@ -351,6 +463,8 @@ class CheezeePayInCallBackWebhook(APIView):
             response['httpstatus'] = status.HTTP_400_BAD_REQUEST
             return Response(response, status=response.get('httpstatus'))
         
+
+
 
 class CheezeePayUPIPayOut(APIView):
 
@@ -397,52 +511,52 @@ class CheezeePayUPIPayOut(APIView):
         
 
 
-class CheezeePayCryptoPayIn(APIView):
-    def post(self, request):
-        try:
+# class CheezeePayCryptoPayIn(APIView):
+#     def post(self, request):
+#         try:
             
-            response = {"status":"success", "errorcode": "", "result":"", "reason": "", "httpstatus": status.HTTP_200_OK}
+#             response = {"status":"success", "errorcode": "", "result":"", "reason": "", "httpstatus": status.HTTP_200_OK}
 
-            data = request.data.get('data')
-            amount = data.get('amount')
-            # Step 2: Prepare payload for Cheezee Pay
-            payload = {
-                "customerMerchantsId": os.environ.get('CHEEZEE_PAY_CRYPTO_CUSTOMER_ID'),
-                "merchantsId": os.environ.get('CHEEZEE_PAY_CRYPTO_MERCHANT_ID'),
-                "chargeMoney": str(amount),   # amount from DB
-                "moneyUnit": "USDT",
-                "merchantsOrderId": str(uuid.uuid4()).replace("-",''),  # your order ID
-                "netWork": "TRC20",
-                "orderVersion": "v1.0",
-                "timestamp": str(int(time.time() * 1000)),
-            }
-            payload["platSign"] = get_sign(payload, CryptoPrivateKey)
+#             data = request.data.get('data')
+#             amount = data.get('amount')
+#             # Step 2: Prepare payload for Cheezee Pay
+#             payload = {
+#                 "customerMerchantsId": os.environ.get('CHEEZEE_PAY_CRYPTO_CUSTOMER_ID'),
+#                 "merchantsId": os.environ.get('CHEEZEE_PAY_CRYPTO_MERCHANT_ID'),
+#                 "chargeMoney": str(amount),   # amount from DB
+#                 "moneyUnit": "USDT",
+#                 "merchantsOrderId": str(uuid.uuid4()).replace("-",''),  # your order ID
+#                 "netWork": "TRC20",
+#                 "orderVersion": "v1.0",
+#                 "timestamp": str(int(time.time() * 1000)),
+#             }
+#             payload["platSign"] = get_sign(payload, CryptoPrivateKey)
 
-            # Step 3: Call Cheezee Pay API (sandbox domain for testing)
-            url = "https://test2-openapi.91fafafa.com/api/business/createCollectionOrder"
-            resp = requests.post(url, json=payload, headers=headers).json()
+#             # Step 3: Call Cheezee Pay API (sandbox domain for testing)
+#             url = "https://test2-openapi.91fafafa.com/api/business/createCollectionOrder"
+#             resp = requests.post(url, json=payload, headers=headers).json()
 
-            print(resp)
-            # Step 4: Verify response and return to frontend
-            if resp.get("code") == "000000":
-                print(resp)
-                if verify_sign(resp, CryptoPublickey):
+#             print(resp)
+#             # Step 4: Verify response and return to frontend
+#             if resp.get("code") == "000000":
+#                 print(resp)
+#                 if verify_sign(resp, CryptoPublickey):
 
-                    response['result'] = {
-                        "data":resp
-                    }
-                    return Response(response, status=response.get('httpstatus'))
+#                     response['result'] = {
+#                         "data":resp
+#                     }
+#                     return Response(response, status=response.get('httpstatus'))
 
-            response['status'] = 'error'
-            response['errorcode'] = status.HTTP_400_BAD_REQUEST
-            response['reason'] = 'Error Crypto Deposit!!'
-            response['httpstatus'] = status.HTTP_400_BAD_REQUEST
-            return Response(response, status=response.get('httpstatus'))
+#             response['status'] = 'error'
+#             response['errorcode'] = status.HTTP_400_BAD_REQUEST
+#             response['reason'] = 'Error Crypto Deposit!!'
+#             response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+#             return Response(response, status=response.get('httpstatus'))
 
-        except Exception as e:
-            print(f"Error in CreateCryptoPayin: {str(e)}")
-            response['status'] = 'error'
-            response['errorcode'] = status.HTTP_400_BAD_REQUEST
-            response['reason'] = str(e)
-            response['httpstatus'] = status.HTTP_400_BAD_REQUEST
-            return Response(response, status=response.get('httpstatus'))
+#         except Exception as e:
+#             print(f"Error in CreateCryptoPayin: {str(e)}")
+#             response['status'] = 'error'
+#             response['errorcode'] = status.HTTP_400_BAD_REQUEST
+#             response['reason'] = str(e)
+#             response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+#             return Response(response, status=response.get('httpstatus'))
