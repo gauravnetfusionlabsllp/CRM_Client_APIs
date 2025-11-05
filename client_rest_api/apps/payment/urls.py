@@ -9,4 +9,8 @@ urlpatterns = [
 
    path('match2pay-pay-in/', views.Match2PayPayIn.as_view(), name="match2pay-pay-in"),
    path('match2pay-pay-in-webhook/', views.Match2PayPayInWebHook.as_view(), name="match2pay-pay-in-webhook"),
+
+   # --------------------------Webhook---------------------------
+
+   path('cheezeepay-upi-payin-webhook/', views.CheezeePayInCallBackWebhook.as_view(), name='cheezeepay-upi-payin-webhook'),
 ]

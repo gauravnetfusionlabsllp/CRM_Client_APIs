@@ -11,6 +11,10 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import os
+
+from dotenv import load_dotenv
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -35,6 +39,24 @@ CORS_ALLOWED_ORIGINS = [
 CORS_ALLOW_ALL_ORIGINS = True
 
 CORS_ALLOW_CREDENTIALS = True
+
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+    'user',
+    'activeId',
+    'user_id',   
+    'auth-token',  
+    'Auth_token' 
+]
+
 
 CSRF_COOKIE_NAME = 'csrftoken'
 CSRF_COOKIE_AGE = 86400
@@ -98,22 +120,32 @@ WSGI_APPLICATION = 'client_rest_api.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
+#     }
+# }
+
+
 DATABASES = {
     # Existing SQLite database
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': os.environ['DB_ENGINE'],
+        'NAME': os.environ['DB_NAME'],
+        'USER': os.environ['DB_USER'],
+        'PASSWORD': os.environ['DB_PASSWORD'],
+        'HOST': os.environ['DB_HOST'],
+        'PORT': os.environ.get('DB_PORT', '5432'),  # optional with default
     },
-    
-    # New PostgreSQL RDS database
     'replica': {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'crmdb',      # replace with actual MySQL DB name
         'USER': 'db_readonly',
         'PASSWORD': '67JQUZHmxbmU4tMn',
         'HOST': 'spectra-replica-db.cxq42qwo0p8j.eu-west-1.rds.amazonaws.com',
-        'PORT': '3306',                     # default MySQL port
-    }
+        'PORT': '3306'
+        }
 }
 
 
