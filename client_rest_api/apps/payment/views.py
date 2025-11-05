@@ -41,6 +41,7 @@ JENA_PAY_ERROR_URL = os.environ.get('JENA_PAY_ERROR_URL')
 # -------------------------Cheesee Pay-------------------------------
 
 CHEEZEE_PAY_RETURN_URL = os.environ.get('CHEEZEE_PAY_RETURN_URL')
+CHEEZEE_PAYIN_WEBHOOK = os.environ.get('CHEEZEE_PAYIN_WEBHOOK')
 
 # -----------------------------DB Connectiosn----------------------------
 
@@ -98,7 +99,8 @@ class JenaPayPayIn(APIView):
                 full_name = str(userData.get('full_name')),
                 email = str(userData.get('email')),
                 brokerUserId = str(brokesrUserId),
-                amount = amount
+                amount = amount,
+                pspName = "JenaPay"
             )
 
             # if userIdData:
@@ -288,6 +290,7 @@ class CheezeePayUPIPayIN(APIView):
             cursor.execute(query, params)
             userData = cursor.fetchone()
 
+
             if not userData:
                 response['status'] = 'error'
                 response['errorcode'] = status.HTTP_401_UNAUTHORIZED
@@ -304,7 +307,7 @@ class CheezeePayUPIPayIN(APIView):
                 pspName = "CheezeePay UPI"
             )
             
-
+            # print(CHEEZEE_PAYIN_WEBHOOK, "------------------------------")
             payload = {
                 "appId": os.environ['CHEEZEE_PAY_APP_ID'],
                 "merchantId": os.environ['CHEEZEE_PAY_MERCHANT_ID'],
@@ -313,8 +316,8 @@ class CheezeePayUPIPayIN(APIView):
                 "amount": amount,
                 "name": str(ordRec.full_name),
                 "timestamp": str(int(time.time() * 1000)),
-                "notifyUrl": "https://trader.sgfx.com/sign-in",
-                "returnUrl": CHEEZEE_PAY_RETURN_URL,
+                "notifyUrl": CHEEZEE_PAYIN_WEBHOOK,
+                "returnUrl": "https://trader.sgfx.com/sign-in",
                 "language": "en",
                 "email": str(ordRec.email),
                 "phone": "+91986475216"
@@ -356,9 +359,9 @@ class CheezeePayUPIPayIN(APIView):
 
                 crmRes = requests.post("https://apicrm.sgfx.com/SignalsCRM//crm-api/brokers/bankings/deposit/manual", json=payload, headers=header).json()
 
-                print(crmRes,"p---------------------------")
-
                 if crmRes['result']['success']:
+                    ordRec.brokerBankingId = str(crmRes['result']['result']['id'])
+                    ordRec.save()
                     response['result'] = {
                         "data": resp,
                         "crmAPI": crmRes
@@ -389,7 +392,7 @@ class CheezeePayInCallBackWebhook(APIView):
     def post(self, request):
         try:
             response = {"status": "success", "errorcode": "", "reason": "", "result": "", "httpstatus": status.HTTP_200_OK}
-
+            print("-----------------Testing")
             param_map = request.data
 
             if not verify_sign(param_map, PlatformPublicKey):
@@ -410,50 +413,60 @@ class CheezeePayInCallBackWebhook(APIView):
             payer_upi_id = param_map.get("payerUpiId", "")
             gmt_end = param_map.get("gmtEnd")
 
-            try:
-                with transaction.atomic():
-                    cursor = connection.cursor(dictionary=True)
-
-                    query = """
-                        SELECT bb.* 
-                        FROM crmdb.broker_banking AS bb 
-                        WHERE bb.psp_transaction_id = %s
-                    """
-
-                    params = (str(mchOrderNo),)
-
-                    cursor.execute(query, params)
-                    row = cursor.fetchone()
-
-                    if row:
-                        brokerBankingId = row['id']
-                        print(brokerBankingId, "-----------------------250")
-                    else:
-                        print("No record found for this PSP Transaction ID")
-
-                    payload = {
-                        "brokerBankingId": brokerBankingId,
-                        "method" : "Crypto",
-                        "comment": "Deposit for Trading Account Approved",
-                        "pspTransactionId" : str(mchOrderNo),
-                        "decisionTime" : datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    }
-
-                    header = {
-                        "Content-Type": "application/json",
-                        "x-crm-api-token": "c6420f81-d146-44c1-807c-2462f9210361"
-                    }
-
-                    crmRes = requests.post("https://apicrm.sgfx.com/SignalsCRM//crm-api/brokers/bankings/deposit/approve", json=payload, headers=header).json()
-
-
-                    if crmRes['result']['success']:
-                        return Response({"code": "200", "msg": "success"}, status=status.HTTP_200_OK)
-
-            except Exception as e:
-                return Response({"code": "400", "msg": "Order Not Found"}, status=status.HTTP_400_BAD_REQUEST)
             
-            return Response({"code": "200", "status": "success"}, status=status.HTTP_200_OK)
+            
+            print("--------------------Started")
+            orderId = str(uuid.UUID(mchOrderNo))
+            orderData = OrderDetails.objects.get(orderId = orderId)
+            print(orderData, "----------------------Order")
+
+            if orderData.status in ["SUCCESS"]:
+                return Response({"code": "200", "msg": "Already processed"}, status=status.HTTP_200_OK)
+
+            cursor = connection.cursor(dictionary=True)
+
+            query = """
+                    SELECT bb.* 
+                    FROM crmdb.broker_banking AS bb 
+                    WHERE bb.psp_transaction_id = %s and bb.broker_user_id = %s and bb.user_id = %s
+                """
+
+            params = (str(mchOrderNo),int(orderData.brokerUserId),int(orderData.userId))
+
+            cursor.execute(query, params)
+            row = cursor.fetchone()
+
+            if row:
+                brokerBankingId = row['id']
+                print(brokerBankingId, "-----------------------250")
+            else:
+                print("No record found for this PSP Transaction ID")
+
+            if orderData.brokerBankingId == str(brokerBankingId):
+                print("testing------------------500")
+            
+                payload = {
+                    "brokerBankingId": brokerBankingId,
+                    "method" : "Crypto",
+                    "comment": "Deposit for Trading Account Approved",
+                    "pspTransactionId" : str(mchOrderNo),
+                    "decisionTime" : datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                }
+
+                header = {
+                    "Content-Type": "application/json",
+                    "x-crm-api-token": "c6420f81-d146-44c1-807c-2462f9210361"
+                }
+                    
+                crmRes = requests.post("https://apicrm.sgfx.com/SignalsCRM//crm-api/brokers/bankings/deposit/approve", json=payload, headers=header).json()
+
+                if crmRes['result']['success']:
+                    orderData.status = "SUCCESS"
+                    orderData.save()
+                    return Response({"code": "200", "msg": "success"}, status=status.HTTP_200_OK)
+            
+            
+            return Response({"code": "400", "status": "failed"}, status=status.HTTP_200_OK)
             
         except Exception as e:
             print(f"Error in PayIn Webhook: {str(e)}")
