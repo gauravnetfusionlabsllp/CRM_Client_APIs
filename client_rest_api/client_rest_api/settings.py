@@ -73,6 +73,8 @@ CSRF_COOKIE_HTTPONLY = False
 
 INSTALLED_APPS = [
     'apps.payment',
+    'apps.core',
+    'apps.users',
     'rest_framework',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -125,6 +127,7 @@ WSGI_APPLICATION = 'client_rest_api.wsgi.application'
 
 
 DATABASES = {
+    # Existing SQLite database
     'default': {
         'ENGINE': os.environ['DB_ENGINE'],
         'NAME': os.environ['DB_NAME'],
@@ -132,8 +135,17 @@ DATABASES = {
         'PASSWORD': os.environ['DB_PASSWORD'],
         'HOST': os.environ['DB_HOST'],
         'PORT': os.environ.get('DB_PORT', '5432'),  # optional with default
-    }
+    },
+    'replica': {
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'crmdb',      # replace with actual MySQL DB name
+        'USER': 'db_readonly',
+        'PASSWORD': '67JQUZHmxbmU4tMn',
+        'HOST': 'spectra-replica-db.cxq42qwo0p8j.eu-west-1.rds.amazonaws.com',
+        'PORT': '3306'
+        }
 }
+
 
 
 # Password validation
