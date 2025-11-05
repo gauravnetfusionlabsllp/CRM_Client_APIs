@@ -29,7 +29,8 @@ ALLOWED_HOSTS = ['*']
 CORS_ALLOWED_ORIGINS = [
     "http://192.168.15.63:5005", "http://localhost:5005","http://www.cosmicrms.com","https://www.cosmicrms.com","http://192.168.15.63:8500", "http://192.168.15.106:5005", "http://192.168.15.106:9009",
     "http://alphatrade.fortiddns.com:5000", "http://alphatrade.fortiddns.com",
-    "http://alphatrade.fortiddns.com:5005", "http://localhost:8200", "http://192.168.15.106:8200", "http://alphatrade.fortiddns.com:8200", "http://alphatrade.fortiddns.com:5000","http://192.168.15.104:5000/","https://36af9a098a67.ngrok-free.app", "https://66730f27c2d6.ngrok-free.app","http://192.168.15.104:5000","http://192.168.15.104:5173"
+    "http://alphatrade.fortiddns.com:5005", "http://localhost:8200", "http://192.168.15.106:8200", "http://alphatrade.fortiddns.com:8200", "http://alphatrade.fortiddns.com:5000","http://192.168.15.104:5000/","https://36af9a098a67.ngrok-free.app", "https://66730f27c2d6.ngrok-free.app","http://192.168.15.104:5000","http://192.168.15.104:5173",
+    "https://8f5801078bd4.ngrok-free.app"
 ]
 CORS_ALLOW_ALL_ORIGINS = True
 
@@ -42,7 +43,8 @@ CSRF_COOKIE_SECURE = False
 CSRF_TRUSTED_ORIGINS = [
     "http://192.168.15.63:5005", "http://localhost:5005","http://www.cosmicrms.com","https://www.cosmicrms.com","http://192.168.15.106:5005",  
     "http://192.168.15.106:9009", "http://alphatrade.fortiddns.com:5000", "http://alphatrade.fortiddns.com",
-    "http://alphatrade.fortiddns.com:5005", "http://localhost:8200", "http://192.168.15.106:8200", "http://alphatrade.fortiddns.com:8200", "http://alphatrade.fortiddns.com:5001","https://36af9a098a67.ngrok-free.app", "https://66730f27c2d6.ngrok-free.app","http://192.168.15.104:5000","http://192.168.15.104:5173"
+    "http://alphatrade.fortiddns.com:5005", "http://localhost:8200", "http://192.168.15.106:8200", "http://alphatrade.fortiddns.com:8200", "http://alphatrade.fortiddns.com:5001","https://36af9a098a67.ngrok-free.app", "https://66730f27c2d6.ngrok-free.app","http://192.168.15.104:5000","http://192.168.15.104:5173",
+    "https://8f5801078bd4.ngrok-free.app"
 ]
 CSRF_COOKIE_HTTPONLY = False 
 
@@ -51,6 +53,8 @@ CSRF_COOKIE_HTTPONLY = False
 
 INSTALLED_APPS = [
     'apps.payment',
+    'apps.core',
+    'apps.users',
     'rest_framework',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -95,11 +99,23 @@ WSGI_APPLICATION = 'client_rest_api.wsgi.application'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
+    # Existing SQLite database
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
+    },
+    
+    # New PostgreSQL RDS database
+    'replica': {
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'crmdb',      # replace with actual MySQL DB name
+        'USER': 'db_readonly',
+        'PASSWORD': '67JQUZHmxbmU4tMn',
+        'HOST': 'spectra-replica-db.cxq42qwo0p8j.eu-west-1.rds.amazonaws.com',
+        'PORT': '3306',                     # default MySQL port
     }
 }
+
 
 
 # Password validation

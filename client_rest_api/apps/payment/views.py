@@ -17,10 +17,15 @@ from rest_framework.parsers import JSONParser
 from dotenv import load_dotenv
 
 from apps.payment.helpers.payment_signature_creater_helpers import jena_pay_generate_signature
+from apps.payment.helpers.match2pay_sign import generate_signature
 load_dotenv()
 
+from django.http import JsonResponse, HttpResponseBadRequest
+
+from apps.core.serializers import PaymentRequestSerializer
 import uuid
 import json
+
 
 # ---------------Jena Pay--------------------------
 
@@ -39,7 +44,96 @@ CHEEZEE_PAY_RETURN_URL = os.environ.get('CHEEZEE_PAY_RETURN_URL')
 
 
 # Create your views here.
+# --------------------------- MATCH 2 PAY -----------------------------------
+MATCH2PAY_PAYIN_URL = os.environ.get('MATCH2PAY_PAYIN_URL')
+MATCH2PAY_API_SECRETE = os.environ.get('MATCH2PAY_API_SECRETE')
+MATCH2PAY_PAY_API_TOKEN = os.environ.get('MATCH2PAY_PAY_API_TOKEN')
+MATCH2PAY_CALLBACK_URL = os.environ.get('MATCH2PAY_CALLBACK_URL')
+MATCH2PAY_FAILURE_URL = os.environ.get('MATCH2PAY_FAILURE_URL')
+MATCH2PAY_SUCCESS_URL = os.environ.get('MATCH2PAY_SUCCESS_URL')
 
+class Match2PayPayIn(APIView):
+    def post(self, request):
+        response = {"status": "success", "errorcode": "", "reason": "", "result":"", "httpstatus": status.HTTP_200_OK}
+        try:
+            request_body = request.data.get('data')
+            serializer = PaymentRequestSerializer(data=request_body)
+            if serializer.is_valid():
+                # print(serializer.validated_data)
+                serialized_data = serializer.validated_data
+                serialized_data['apiToken'] = MATCH2PAY_PAY_API_TOKEN
+                serialized_data['callbackUrl'] = MATCH2PAY_CALLBACK_URL
+                serialized_data['currency'] = 'USD'
+                serialized_data['failureUrl'] = MATCH2PAY_FAILURE_URL
+                serialized_data['paymentCurrency'] = "USX"
+                serialized_data['paymentGatewayName'] = "USDT TRC20"
+                serialized_data['paymentMethod'] = "CRYPTO_AGENT"
+                serialized_data['successUrl'] = MATCH2PAY_SUCCESS_URL
+                serialized_data['timestamp'] = '1764149779000'
+                serialized_data["signature"] = generate_signature(serialized_data, MATCH2PAY_API_SECRETE)
+                headers = {'Content-Type': 'application/json'}
+                response_data = requests.post(
+                    MATCH2PAY_PAYIN_URL,
+                    headers=headers,
+                    data=json.dumps(serialized_data)
+                )
+                try:
+                    data = response_data.json()
+                except ValueError:
+                    return Response(
+                        {"error": "Invalid JSON response_data from Match2Pay", "raw": response_data.text},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                response['result'] = data
+                return JsonResponse(response, status=status.HTTP_200_OK)
+            else:
+                print(serializer.errors)
+
+        except Exception as e:
+            print("ERROR in Match2PayPayIn: ", str(e))
+        return JsonResponse(response, status=status.HTTP_200_OK)
+
+
+class Match2PayPayInWebHook(APIView):
+    def post(self, request):
+        try:
+            data = json.loads(request.body.decode('utf-8'))
+        except json.JSONDecodeError:
+            return HttpResponseBadRequest("Invalid JSON")
+
+        # Log or handle data
+        print(f"Match2Pay callback received: {json.dumps(data, indent=2)}")
+
+        # Example: extract key fields
+        payment_id = data.get('paymentId')
+        status = data.get('status')
+        deposit_address = data.get('depositAddress')
+        transaction_currency = data.get('transactionCurrency')
+        final_amount = data.get('finalAmount')
+        final_currency = data.get('finalCurrency')
+
+        # Access the nested transaction info
+        tx_info = data.get('cryptoTransactionInfo', [{}])[0]
+        txid = tx_info.get('txid')
+        confirmations = tx_info.get('confirmations')
+        amount = tx_info.get('amount')
+        processing_fee = tx_info.get('processingFee')
+        conversion_rate = tx_info.get('conversionRate')
+
+        # Example business logic
+        if status == "PENDING":
+            print(f"Transaction {txid} is pending with {confirmations} confirmations.")
+            # You might mark it as pending in your database here
+
+        elif status == "DONE":
+            print(f"Transaction {txid} confirmed. Final amount: {final_amount} {final_currency}")
+            # Update your database or mark deposit as confirmed
+
+        else:
+            print(f"Unknown status: {status}")
+
+        # Always respond with HTTP 200 to acknowledge receipt
+        return JsonResponse({"status": "ok"})
 
 # ----------------------------Jena PAY-------------------------------------------
 class JenaPayPayIn(APIView):

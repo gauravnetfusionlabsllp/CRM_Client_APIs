@@ -3,6 +3,7 @@
 .venv/
 mt_env/
 d_env/
+env_crm_client/
 
 # Environment variable files
 .env
