@@ -5,8 +5,49 @@ from rest_framework.views import APIView
 from rest_framework.status import *
 from rest_framework.response import Response
 from django.http import JsonResponse
+from rest_framework import status
 from apps.core.WhatsAppLink import create_whatsapp_link
+
+
+from apps.users.helpers.twilio_sending_message_helpers import send_text_message
+
 # Create your views here.
+
+
+class CheckUserPhoneNumber(APIView):
+
+    def get(self, request):
+        try:
+            response = {"status": "success", "errorcode": "", "reason":"", "result": "", "httpstatus": status.HTTP_200_OK}
+
+            phoneNo = request.query_params.get('ph')
+
+            if not phoneNo:
+                response['status'] = 'error'
+                response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                response['reason'] =  "Phone Number is Required!!!"
+                response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                return Response(response, status=response.get('httpstatus'))
+
+            res = send_text_message(phoneNo)
+
+            if not res:
+                response['status'] = 'error'
+                response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                response['reason'] = "OTP not sent!!!"
+                response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                return Response(response, status=response.get('httpstatus'))
+            
+            response['result'] = f"OTP Send Successfully on {phoneNo}"
+            return Response(response, status=response.get('httpstatus'))
+
+        except Exception as e:
+            print(f"Error in the Validation User Phone Number: {str(e)}")
+            response['status'] = 'error'
+            response['errorcode'] = status.HTTP_400_BAD_REQUEST
+            response['reason'] = str(e)
+            response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+            return Response(response, status=response.get('httpstatus'))
 
 
 

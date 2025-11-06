@@ -26,7 +26,7 @@ class OrderDetails(TimeStampModel):
     amount = models.CharField(max_length=150, unique=False, null=True, blank=True)
     status = models.CharField(max_length = 150, choices=STATUS_CHOICES, default='PENDING')
     tradingId = models.CharField(max_length=150, null=True, blank=True)
-    userTradingAcc = models.CharField(max_length=150, null=True, blank=True)
+    brokerBankingId = models.CharField(max_length=150, null=True, blank=True)
     pspName = models.CharField(max_length=150, null=True, blank=True)
     
 
