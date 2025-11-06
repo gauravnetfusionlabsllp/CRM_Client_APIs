@@ -33,7 +33,7 @@ ALLOWED_HOSTS = ['*']
 CORS_ALLOWED_ORIGINS = [
     "http://192.168.15.63:5005", "http://localhost:5005","http://www.cosmicrms.com","https://www.cosmicrms.com","http://192.168.15.63:8500", "http://192.168.15.106:5005", "http://192.168.15.106:9009",
     "http://alphatrade.fortiddns.com:5000", "http://alphatrade.fortiddns.com",
-    "http://alphatrade.fortiddns.com:5005", "http://localhost:8200", "http://192.168.15.106:8200", "http://alphatrade.fortiddns.com:8200", "http://alphatrade.fortiddns.com:5000","http://192.168.15.104:5000/","https://36af9a098a67.ngrok-free.app", "https://66730f27c2d6.ngrok-free.app","http://192.168.15.104:5000","http://192.168.15.104:5173", "https://24594455b8fb.ngrok-free.app",
+    "http://alphatrade.fortiddns.com:5005", "http://localhost:8200", "http://192.168.15.106:8200", "http://alphatrade.fortiddns.com:8200", "http://alphatrade.fortiddns.com:5000","http://192.168.15.104:5000/","https://36af9a098a67.ngrok-free.app", "https://66730f27c2d6.ngrok-free.app","http://192.168.15.104:5000","http://192.168.15.104:5173", "https://28867c9b7ede.ngrok-free.app",
 ]
 CORS_ALLOW_ALL_ORIGINS = True
 
@@ -64,7 +64,7 @@ CSRF_COOKIE_SECURE = False
 CSRF_TRUSTED_ORIGINS = [
     "http://192.168.15.63:5005", "http://localhost:5005","http://www.cosmicrms.com","https://www.cosmicrms.com","http://192.168.15.106:5005",  
     "http://192.168.15.106:9009", "http://alphatrade.fortiddns.com:5000", "http://alphatrade.fortiddns.com",
-    "http://alphatrade.fortiddns.com:5005", "http://localhost:8200", "http://192.168.15.106:8200", "http://alphatrade.fortiddns.com:8200", "http://alphatrade.fortiddns.com:5001","https://36af9a098a67.ngrok-free.app", "https://66730f27c2d6.ngrok-free.app","http://192.168.15.104:5000","http://192.168.15.104:5173", "hhttps://24594455b8fb.ngrok-free.app"
+    "http://alphatrade.fortiddns.com:5005", "http://localhost:8200", "http://192.168.15.106:8200", "http://alphatrade.fortiddns.com:8200", "http://alphatrade.fortiddns.com:5001","https://36af9a098a67.ngrok-free.app", "https://66730f27c2d6.ngrok-free.app","http://192.168.15.104:5000","http://192.168.15.104:5173", "https://28867c9b7ede.ngrok-free.app"
 ]
 CSRF_COOKIE_HTTPONLY = False 
 

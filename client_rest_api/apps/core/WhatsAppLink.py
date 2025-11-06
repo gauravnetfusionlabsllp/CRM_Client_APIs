@@ -23,8 +23,8 @@ def create_whatsapp_link(phone_number: str, message: str) -> str:
 
 # Example 1: Specific phone number
 link_with_number = create_whatsapp_link("919579834493", "I'm interested in your car for sale")
-print("Link with number:", link_with_number)
+# print("Link with number:", link_with_number)
 
 # Example 2: No number (user chooses contact)
 link_without_number = create_whatsapp_link("", "I'm inquiring about the apartment listing")
-print("Link without number:", link_without_number)
+# print("Link without number:", link_without_number)
