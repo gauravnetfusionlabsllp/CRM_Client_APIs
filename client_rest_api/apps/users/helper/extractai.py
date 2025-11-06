@@ -23,15 +23,27 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 # -------------------------------------------------------------
 # Define Structured Output Model (Pydantic)
 # -------------------------------------------------------------
+class Address(BaseModel):
+    house_number: Optional[str]
+    street: Optional[str]
+    city: Optional[str]
+    state: Optional[str]
+    zip: Optional[str]
+    full_address: Optional[str]
+
 class IDCardDetails(BaseModel):
-    country: Optional[str]                # e.g. India, USA, UAE
-    document_type: Optional[str]          # e.g. Passport, License, National ID
-    first_name: Optional[str]             # Extracted first name
-    last_name: Optional[str]              # Extracted last name
-    full_name: Optional[str]              # Combined version (for validation)
-    dob: Optional[str]                    # YYYY-MM-DD format
+    country: Optional[str]
+    document_type: Optional[str]
+    first_name: Optional[str]
+    middle_name: Optional[str]
+    last_name: Optional[str]
+    full_name: Optional[str]
+    dob: Optional[str]
     id_number: Optional[str]
-    address: Optional[str]
+
+    # Replace old address field
+    address: Optional[Address]
+
     issue_date: Optional[str]
     expiry_date: Optional[str]
     confidence_notes: Optional[str]
@@ -59,13 +71,36 @@ def extract_id_details(ocr_text: str, doc_hint: str = "") -> IDCardDetails:
             {
                 "role": "system",
                 "content": (
-                    "You are a multilingual, country-agnostic document data extraction assistant. "
-                    "Extract structured information (identity or document details) from OCR text. "
-                    "You must infer the country and document type automatically based on layout, language, and keywords. "
-                    "If the name appears, split it into first_name and last_name properly. "
-                    "Also include a full_name field combining them. "
-                    "Supported documents include Passport, National ID, Driving License, Residence ID, etc. "
-                    "If uncertain, set missing fields as null. Use ISO date format (YYYY-MM-DD) when possible."
+                    "You are a multilingual, country-agnostic document extraction assistant. "
+                    "Your job is to extract clean structured information from noisy OCR text. "
+
+                    "### NAME EXTRACTION RULES ### "
+                    "- Indian documents (e.g., Aadhaar, PAN, Voter ID, Driving License) often have a single line full name. "
+                    "- If the name appears as three words (e.g., 'Rahul Kumar Sharma'), treat: "
+                    "    first_name = first word "
+                    "    middle_name = second word "
+                    "    last_name = third word "
+                    "- If the name appears as two words, treat: "
+                    "    first_name = first word "
+                    "    last_name = second word "
+                    "    middle_name = null "
+                    "- Ignore prefixes like 'S/O', 'W/O', 'D/O'. "
+                    "- Never guess random names. Extract only from text. "
+
+                    "### ADDRESS EXTRACTION ### "
+                    "Extract address as an object with keys: house_number, street, city, state, zip, full_address. "
+                    "If you cannot find a field, return null. "
+
+                    "### DOCUMENT TYPE / COUNTRY ### "
+                    "Identify document type automatically (Aadhaar Card, Passport, etc.). "
+                    "Identify country when possible. If not obvious, return null. "
+
+                    "### GENERAL RULES ### "
+                    "- Use only exact logic based on the OCR text. "
+                    "- Do NOT hallucinate details. "
+                    "- Use ISO dates (YYYY-MM-DD). "
+                    "- Output must match the Pydantic model."
+
                 ),
             },
             {

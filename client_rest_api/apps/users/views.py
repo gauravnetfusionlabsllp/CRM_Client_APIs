@@ -5,15 +5,57 @@ from rest_framework.views import APIView
 from rest_framework.status import *
 from rest_framework.response import Response
 from django.http import JsonResponse
+from rest_framework import status
 from apps.core.WhatsAppLink import create_whatsapp_link
 import tempfile
 import os
 from apps.users.helper.extractai import *
 from apps.users.serializers import *
 import requests
+from dotenv import load_dotenv
+import json
+
+from apps.users.helpers.twilio_sending_message_helpers import send_text_message
+
 # Create your views here.
 
 load_dotenv()
+
+class CheckUserPhoneNumber(APIView):
+
+    def get(self, request):
+        try:
+            response = {"status": "success", "errorcode": "", "reason":"", "result": "", "httpstatus": status.HTTP_200_OK}
+
+            phoneNo = request.query_params.get('ph')
+
+            if not phoneNo:
+                response['status'] = 'error'
+                response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                response['reason'] =  "Phone Number is Required!!!"
+                response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                return Response(response, status=response.get('httpstatus'))
+
+            res = send_text_message(phoneNo)
+
+            if not res:
+                response['status'] = 'error'
+                response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                response['reason'] = "OTP not sent!!!"
+                response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                return Response(response, status=response.get('httpstatus'))
+            
+            response['result'] = f"OTP Send Successfully on {phoneNo}"
+            return Response(response, status=response.get('httpstatus'))
+
+        except Exception as e:
+            print(f"Error in the Validation User Phone Number: {str(e)}")
+            response['status'] = 'error'
+            response['errorcode'] = status.HTTP_400_BAD_REQUEST
+            response['reason'] = str(e)
+            response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+            return Response(response, status=response.get('httpstatus'))
+
 
 
 class RegisterView(APIView):
@@ -22,7 +64,9 @@ class RegisterView(APIView):
         try:
             response = {"status": "success", "errorcode": "","reason": "", "result": "", "httpstatus": HTTP_200_OK}
             __data = request.data.get('data')            
-
+            
+            print(__data.get('email'))
+            
             CRM_REGISTER_URL = os.getenv("CRM_REGISTER_URL")
             # Headers for the external API
             headers = {
@@ -40,18 +84,39 @@ class RegisterView(APIView):
                 "languageIso":__data.get('languageIso'),
             }
             response_data = requests.post(CRM_REGISTER_URL, json=register_payload, headers=headers)
-            # Try to parse response JSON safely
             try:
                 res_json = response_data.json()
             except Exception:
                 res_json = {"raw_response": response_data.text}
             if res_json.get('success') == True:
+                try:
+                    record = RegistrationLog.objects.get(email=__data.get('email'))
+                except RegistrationLog.DoesNotExist:
+                    record = None
+                if record:
+                    log_update = {
+                        'wpotpverified': __data.get('wpotpverified', record.wpotpverified),
+                        'wpqrverified': __data.get('wpqrverified', record.wpqrverified),
+                        'smsotpverified': __data.get('smsotpverified', record.smsotpverified),
+                    }
+                    serializer = RegistrationLogSerializer(record, data=log_update, partial=True)
+                    if serializer.is_valid():
+                        try:
+                            serializer.save()
+                            print("Record updated successfully")
+                        except Exception as save_exception:
+                            print(f"Error saving record: {save_exception}")
+                    else:
+                        print(f"Serializer validation errors: {serializer.errors}")
+                else:
+                    print("No record found with the provided email")
+                    
                 response['httpstatus'] = HTTP_200_OK
                 response['status'] = "success"
-                response['result'] = str(res_json.get('result'))
+                response['result'] = res_json.get('result')
             else:
                 response["status"] = "error"
-                response["reason"] = str(res_json.get('error'))
+                response["reason"] = res_json.get('error')
                 response["httpstatus"] = HTTP_400_BAD_REQUEST
 
             return JsonResponse(response, status=response['httpstatus'])

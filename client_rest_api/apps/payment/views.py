@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime
 from django.shortcuts import render
 from rest_framework.response import Response
 from rest_framework import status
@@ -46,6 +46,7 @@ JENA_PAY_ERROR_URL = os.environ.get('JENA_PAY_ERROR_URL')
 # -------------------------Cheesee Pay-------------------------------
 
 CHEEZEE_PAY_RETURN_URL = os.environ.get('CHEEZEE_PAY_RETURN_URL')
+CHEEZEE_PAYIN_WEBHOOK = os.environ.get('CHEEZEE_PAYIN_WEBHOOK')
 
 # -----------------------------DB Connectiosn----------------------------
 
@@ -164,8 +165,15 @@ class JenaPayPayIn(APIView):
 
             data = request.data.get('data')
             amount = data.get('amount')
-            authToken = data.get('Auth-Token')
+            authToken = request.headers.get('Auth-Token')
             brokesrUserId = data.get('brokesrUserId')
+
+            if not all([amount, authToken, brokesrUserId]):
+                response['status'] = 'error'
+                response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                response['reason'] = "Amount, Broker and brokerUserId are required fileds!!!"
+                response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                return Response(response, status=response.get('httpstatus'))
 
             cursor = connection.cursor(dictionary=True)
 
@@ -198,7 +206,8 @@ class JenaPayPayIn(APIView):
                 full_name = str(userData.get('full_name')),
                 email = str(userData.get('email')),
                 brokerUserId = str(brokesrUserId),
-                amount = amount
+                amount = amount,
+                pspName = "JenaPay"
             )
 
             # if userIdData:
@@ -308,40 +317,41 @@ class JenaPayPayInCallBack(APIView):
                     orderData = OrderDetails.objects.get(orderId = orderId)
                     print(orderData, "---------------")
 
-                    if orderData.status != "SUCCESS":
-                        cursor = connection.cursor(dictionary=True)
+                    if orderData.status in ["SUCCESS"]:
+                        return Response({"code": "200", "msg": "Already processed"}, status=status.HTTP_200_OK)
+                    cursor = connection.cursor(dictionary=True)
 
-                        query = """
-                            SELECT bb.* 
-                            FROM crmdb.broker_banking AS bb 
-                            WHERE bb.psp_transaction_id = %s and bb.broker_user_id = %s and bb.user_id = %s
-                        """
+                    query = """
+                        SELECT bb.* 
+                        FROM crmdb.broker_banking AS bb 
+                        WHERE bb.psp_transaction_id = %s and bb.broker_user_id = %s and bb.user_id = %s
+                    """
 
-                        params = (str(order_number), orderData.brokerUserId, orderData.userId)
+                    params = (str(order_number), orderData.brokerUserId, orderData.userId)
 
-                        cursor.execute(query, params)
-                        row = cursor.fetchone()
+                    cursor.execute(query, params)
+                    row = cursor.fetchone()
 
-                        # if row:
-                        #     brokerBankingId = row['id']
+                    # if row:
+                    #     brokerBankingId = row['id']
 
-                        # payload = {
-                        #     "brokerBankingId": brokerBankingId,
-                        #     "method" : "Crypto",
-                        #     "comment": "Deposit for Trading Account Approved",
-                        #     "pspTransactionId" : str(order_number),
-                        #     "decisionTime" : datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        # }
+                    # payload = {
+                    #     "brokerBankingId": brokerBankingId,
+                    #     "method" : "Crypto",
+                    #     "comment": "Deposit for Trading Account Approved",
+                    #     "pspTransactionId" : str(order_number),
+                    #     "decisionTime" : datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    # }
 
-                        # header = {
-                        #     "Content-Type": "application/json",
-                        #     "x-crm-api-token": "c6420f81-d146-44c1-807c-2462f9210361"
-                        # }
+                    # header = {
+                    #     "Content-Type": "application/json",
+                    #     "x-crm-api-token": "c6420f81-d146-44c1-807c-2462f9210361"
+                    # }
 
-                        # crmRes = requests.post("https://apicrm.sgfx.com/SignalsCRM//crm-api/brokers/bankings/deposit/approve", json=payload, headers=header).json()
+                    # crmRes = requests.post("https://apicrm.sgfx.com/SignalsCRM//crm-api/brokers/bankings/deposit/approve", json=payload, headers=header).json()
 
 
-                    # if crmRes['result']['success']:
+                # if crmRes['result']['success']:
                     return Response({"code": "200", "msg": "success"}, status=status.HTTP_200_OK)
 
             except Exception as e:
@@ -366,8 +376,15 @@ class CheezeePayUPIPayIN(APIView):
             response = {"status": "success", "errorcode": "", "reason": "", "result": "", "httpstatus": status.HTTP_200_OK}
             data = request.data.get('data')
             amount = data.get('amount')
-            authToken = data.get('Auth-Token')
+            authToken = request.headers.get('Auth-Token')
             brokerUserId = data.get('brokerUserId')
+
+            if not all([amount, authToken, brokerUserId]):
+                response['status'] = 'error'
+                response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                response['reason'] = "Amount, Broker, and brokerUserId are required fileds!!!"
+                response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                return Response(response, status=response.get('httpstatus'))
 
             cursor = connection.cursor(dictionary=True)
 
@@ -404,7 +421,7 @@ class CheezeePayUPIPayIN(APIView):
                 pspName = "CheezeePay UPI"
             )
             
-
+            # print(CHEEZEE_PAYIN_WEBHOOK, "------------------------------")
             payload = {
                 "appId": os.environ['CHEEZEE_PAY_APP_ID'],
                 "merchantId": os.environ['CHEEZEE_PAY_MERCHANT_ID'],
@@ -413,11 +430,11 @@ class CheezeePayUPIPayIN(APIView):
                 "amount": amount,
                 "name": str(ordRec.full_name),
                 "timestamp": str(int(time.time() * 1000)),
-                "notifyUrl": "https://trader.sgfx.com/sign-in",
-                "returnUrl": CHEEZEE_PAY_RETURN_URL,
+                "notifyUrl": CHEEZEE_PAYIN_WEBHOOK,
+                "returnUrl": "https://trader.sgfx.com/sign-in",
                 "language": "en",
                 "email": str(ordRec.email),
-                "phone": "+91986475216"
+                "phone": "+911234567890"
             }
 
             payload['sign'] = get_sign(payload, MerchantPrivateKey)
@@ -450,15 +467,15 @@ class CheezeePayUPIPayIN(APIView):
                     "status": "Pending",
                     "normalizedAmount": int(amount),
                     "decisionTime": 0,
-                    "declineReason": "Error in Payment Check In.",
+                    "declineReason": "Manual",
                     "brandExternalId": payload.get('mchOrderNo')
                 }
 
                 crmRes = requests.post("https://apicrm.sgfx.com/SignalsCRM//crm-api/brokers/bankings/deposit/manual", json=payload, headers=header).json()
 
-                print(crmRes,"p---------------------------")
-
                 if crmRes['result']['success']:
+                    ordRec.brokerBankingId = str(crmRes['result']['result']['id'])
+                    ordRec.save()
                     response['result'] = {
                         "data": resp,
                         "crmAPI": crmRes
@@ -489,7 +506,6 @@ class CheezeePayInCallBackWebhook(APIView):
     def post(self, request):
         try:
             response = {"status": "success", "errorcode": "", "reason": "", "result": "", "httpstatus": status.HTTP_200_OK}
-
             param_map = request.data
 
             if not verify_sign(param_map, PlatformPublicKey):
@@ -510,50 +526,66 @@ class CheezeePayInCallBackWebhook(APIView):
             payer_upi_id = param_map.get("payerUpiId", "")
             gmt_end = param_map.get("gmtEnd")
 
-            try:
-                with transaction.atomic():
-                    cursor = connection.cursor(dictionary=True)
-
-                    query = """
-                        SELECT bb.* 
-                        FROM crmdb.broker_banking AS bb 
-                        WHERE bb.psp_transaction_id = %s
-                    """
-
-                    params = (str(mchOrderNo),)
-
-                    cursor.execute(query, params)
-                    row = cursor.fetchone()
-
-                    if row:
-                        brokerBankingId = row['id']
-                        print(brokerBankingId, "-----------------------250")
-                    else:
-                        print("No record found for this PSP Transaction ID")
-
-                    payload = {
-                        "brokerBankingId": brokerBankingId,
-                        "method" : "Crypto",
-                        "comment": "Deposit for Trading Account Approved",
-                        "pspTransactionId" : str(mchOrderNo),
-                        "decisionTime" : datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    }
-
-                    header = {
-                        "Content-Type": "application/json",
-                        "x-crm-api-token": "c6420f81-d146-44c1-807c-2462f9210361"
-                    }
-
-                    crmRes = requests.post("https://apicrm.sgfx.com/SignalsCRM//crm-api/brokers/bankings/deposit/approve", json=payload, headers=header).json()
-
-
-                    if crmRes['result']['success']:
-                        return Response({"code": "200", "msg": "success"}, status=status.HTTP_200_OK)
-
-            except Exception as e:
-                return Response({"code": "400", "msg": "Order Not Found"}, status=status.HTTP_400_BAD_REQUEST)
             
-            return Response({"code": "200", "status": "success"}, status=status.HTTP_200_OK)
+            orderId = str(uuid.UUID(mchOrderNo))
+            orderData = OrderDetails.objects.get(orderId = orderId)
+            print(orderData, "----------------------Order")
+
+            if orderData.status in ["SUCCESS"]:
+                return Response({"code": "200", "msg": "Already processed"}, status=status.HTTP_200_OK)
+
+            cursor = connection.cursor(dictionary=True)
+
+            query = """
+                    SELECT bb.* 
+                    FROM crmdb.broker_banking AS bb 
+                    WHERE bb.psp_transaction_id = %s and bb.broker_user_id = %s and bb.user_id = %s
+                """
+
+            params = (str(mchOrderNo),int(orderData.brokerUserId),int(orderData.userId))
+
+            cursor.execute(query, params)
+            row = cursor.fetchone()
+            if row:
+                brokerBankingId = row['id']
+                print(brokerBankingId, "-----------------------250")
+            else:
+                print("No record found for this PSP Transaction ID")
+                return Response({"code": "400", "msg": "failed"}, status=status.HTTP_200_OK)
+
+            if orderData.brokerBankingId == str(brokerBankingId):
+                print("testing------------------500")
+            
+                payload = {
+                    "brokerBankingId": brokerBankingId,
+                    "method" : "Crypto",
+                    "comment": "Deposit for Trading Account Approved",
+                    "pspTransactionId" : str(mchOrderNo),
+                    "decisionTime" : int(datetime.now().timestamp() * 1000)
+                }
+
+                header = {
+                    "Content-Type": "application/json",
+                    "x-crm-api-token": "c6420f81-d146-44c1-807c-2462f9210361"
+                }
+                    
+                crmRes = requests.post("https://apicrm.sgfx.com/SignalsCRM//crm-api/brokers/bankings/deposit/approve", json=payload, headers=header).json()
+
+                os.makedirs("crm_logs", exist_ok=True)
+                filename = f"crm_logs/crm_response_{orderData.orderId}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+
+                with open(filename, "w", encoding="utf-8") as f:
+                    json.dump(crmRes, f, indent=4, ensure_ascii=False)
+
+                if crmRes.get('success'):
+                    orderData.status = "SUCCESS"
+                    orderData.tradingId = str(crmRes['result']['brokerUserExternalId'])
+                    orderData.save()
+                    print("--------------------Successs")
+                    return Response({"code": "200", "msg": "success"}, status=status.HTTP_200_OK)
+            
+            
+            return Response({"code": "400", "status": "failed"}, status=status.HTTP_200_OK)
             
         except Exception as e:
             print(f"Error in PayIn Webhook: {str(e)}")
