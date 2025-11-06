@@ -6,9 +6,60 @@ from rest_framework.status import *
 from rest_framework.response import Response
 from django.http import JsonResponse
 from apps.core.WhatsAppLink import create_whatsapp_link
+import tempfile
+import os
+from apps.users.helper.extractai import *
+from apps.users.serializers import *
+import requests
 # Create your views here.
 
+load_dotenv()
 
+
+class RegisterView(APIView):
+
+    def post(self, request):
+        try:
+            response = {"status": "success", "errorcode": "","reason": "", "result": "", "httpstatus": HTTP_200_OK}
+            __data = request.data.get('data')            
+
+            CRM_REGISTER_URL = os.getenv("CRM_REGISTER_URL")
+            # Headers for the external API
+            headers = {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            }
+            register_payload = {
+                "email":__data.get('email'),
+                "password":__data.get('password'),
+                "firstName":__data.get('firstName'),
+                "lastName":__data.get('lastName'),
+                "telephone":__data.get('telephone'),
+                "telephonePrefix":__data.get('telephonePrefix'),
+                "countryIso":__data.get('countryIso'),
+                "languageIso":__data.get('languageIso'),
+            }
+            response_data = requests.post(CRM_REGISTER_URL, json=register_payload, headers=headers)
+            # Try to parse response JSON safely
+            try:
+                res_json = response_data.json()
+            except Exception:
+                res_json = {"raw_response": response_data.text}
+            if res_json.get('success') == True:
+                response['httpstatus'] = HTTP_200_OK
+                response['status'] = "success"
+                response['result'] = str(res_json.get('result'))
+            else:
+                response["status"] = "error"
+                response["reason"] = str(res_json.get('error'))
+                response["httpstatus"] = HTTP_400_BAD_REQUEST
+
+            return JsonResponse(response, status=response['httpstatus'])
+        except Exception as e:
+            response["status"] = "error"
+            response["reason"] = str(e)
+            response["httpstatus"] = HTTP_400_BAD_REQUEST
+            return JsonResponse(response, status=response['httpstatus'])
 
 class CheckEmail(APIView):
 
@@ -33,6 +84,61 @@ class CheckEmail(APIView):
                 else:
                     response['httpstatus'] = HTTP_200_OK
                     response['status'] = "success"
+            
+            return JsonResponse(response, status=response['httpstatus'])
+        except Exception as e:
+            response["status"] = "error"
+            response["reason"] = str(e)
+            response["httpstatus"] = HTTP_400_BAD_REQUEST
+            return JsonResponse(response, status=response['httpstatus'])
+
+
+
+class ExtractDocumentData(APIView):
+
+    def post(self, request):
+        try:
+            response = {"status": "success", "errorcode": "","reason": "", "result": "", "httpstatus": HTTP_200_OK}
+            __data = request.data            
+            print(__data)
+            
+            # CHECKING IF THE REQUEST MESSAGE IS VALID OR NOT            
+            # postserializer = PostDataSerializer(data=__data)
+            # if not postserializer.is_valid():
+            #     response["status"] = "error"
+            #     response["reason"] = str(postserializer.errors)
+            #     response["httpstatus"] = HTTP_400_BAD_REQUEST
+            # else:
+            uploaded_file = request.FILES.get("file")
+            if not uploaded_file:
+                response["status"] = "error"
+                response["reason"] = "No file provided in request."
+                response["httpstatus"] = HTTP_400_BAD_REQUEST
+                return JsonResponse(response, status=response["httpstatus"])
+
+            # 2️⃣ Save to a temporary file
+            with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(uploaded_file.name)[1]) as tmp_file:
+                for chunk in uploaded_file.chunks():
+                    tmp_file.write(chunk)
+                tmp_path = tmp_file.name
+
+            # Optional: get document hint (e.g., PAN / AADHAAR)
+            doc_hint = request.data.get("event", "")
+
+            # 3️⃣ Call your helper function
+            result = extract_from_image(tmp_path, doc_hint)
+
+            # 4️⃣ Clean up
+            if result.get('httpstatus')==200:
+                result.get('result')['email'] = __data.get('email') 
+                print(result)
+                serializer = RegistrationLogSerializer(data=result.get('result'))
+                if serializer.is_valid():
+                    serializer.save()
+            os.remove(tmp_path)
+
+            # 5️⃣ Return result from helper
+            return JsonResponse(result, status=result.get("httpstatus", HTTP_200_OK))
             
             return JsonResponse(response, status=response['httpstatus'])
         except Exception as e:
