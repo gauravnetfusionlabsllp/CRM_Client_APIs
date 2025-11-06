@@ -113,13 +113,14 @@ class Match2PayPayInWebHook(APIView):
     def post(self, request):
         try:
             data = json.loads(request.body.decode('utf-8'))
+            print(data)
         except json.JSONDecodeError:
             return HttpResponseBadRequest("Invalid JSON")
 
-        # Log or handle data
+        # Log callback
         print(f"Match2Pay callback received: {json.dumps(data, indent=2)}")
 
-        # Example: extract key fields
+        # Key fields
         payment_id = data.get('paymentId')
         status = data.get('status')
         deposit_address = data.get('depositAddress')
@@ -127,28 +128,33 @@ class Match2PayPayInWebHook(APIView):
         final_amount = data.get('finalAmount')
         final_currency = data.get('finalCurrency')
 
-        # Access the nested transaction info
-        tx_info = data.get('cryptoTransactionInfo', [{}])[0]
-        txid = tx_info.get('txid')
-        confirmations = tx_info.get('confirmations')
-        amount = tx_info.get('amount')
-        processing_fee = tx_info.get('processingFee')
-        conversion_rate = tx_info.get('conversionRate')
+        # Safely access nested transaction info
+        crypto_tx_info = data.get('cryptoTransactionInfo', [])
+        tx_info = crypto_tx_info[0] if crypto_tx_info else None
 
-        # Example business logic
+        if tx_info:
+            txid = tx_info.get('txid')
+            confirmations = tx_info.get('confirmations')
+            amount = tx_info.get('amount')
+            processing_fee = tx_info.get('processingFee')
+            conversion_rate = tx_info.get('conversionRate')
+        else:
+            txid = confirmations = amount = processing_fee = conversion_rate = None
+
+        # Business logic
         if status == "PENDING":
             print(f"Transaction {txid} is pending with {confirmations} confirmations.")
-            # You might mark it as pending in your database here
+            # mark as pending in DB
 
         elif status == "DONE":
             print(f"Transaction {txid} confirmed. Final amount: {final_amount} {final_currency}")
-            # Update your database or mark deposit as confirmed
+            # mark deposit as confirmed
 
         else:
-            print(f"Unknown status: {status}")
+            print(f"Status {status} - no action needed yet.")
 
-        # Always respond with HTTP 200 to acknowledge receipt
         return JsonResponse({"status": "ok"})
+
 
 # ----------------------------Jena PAY-------------------------------------------
 class JenaPayPayIn(APIView):
