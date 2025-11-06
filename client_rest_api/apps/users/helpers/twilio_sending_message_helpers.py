@@ -1,20 +1,27 @@
 from twilio.rest import Client
 import os
-
+import random
+from django.core.cache import cache
 from dotenv import load_dotenv
 load_dotenv()
 
 
 account_sid = os.environ['TWILIO_ACCOUNT_SID']
 auth_token = os.environ['TWILIO_AUTH_TOKEN']
-client = Client(account_sid, auth_token)
 
 def send_text_message(phoneNo):
     try:
-        message = client.messages(
-            body = "This is Testing Message!!!",
-            from_ = "",
-            to = ""
+        formatNo = str("+"+phoneNo).replace(" ","")
+
+        otp = str(random.randint(100000, 999999))
+        cache.set(f"otp_{phoneNo}", otp, timeout=300)
+
+        client = Client(account_sid, auth_token)
+     
+        message = client.messages.create(
+            body = f"Time To Leave its almost 6 pm!!! {otp}",
+            from_ = "+12175831441",
+            to = formatNo
         )
 
         print(message, "--------------------150")

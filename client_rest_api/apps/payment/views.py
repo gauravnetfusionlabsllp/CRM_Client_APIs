@@ -376,10 +376,12 @@ class CheezeePayUPIPayIN(APIView):
             response = {"status": "success", "errorcode": "", "reason": "", "result": "", "httpstatus": status.HTTP_200_OK}
             data = request.data.get('data')
             amount = data.get('amount')
+            amountWithFees = data.get('amountWithFees')
+            usdAmount = data.get('usdAmount')
             authToken = request.headers.get('Auth-Token')
             brokerUserId = data.get('brokerUserId')
 
-            if not all([amount, authToken, brokerUserId]):
+            if not all([amount, authToken, brokerUserId, amountWithFees]):
                 response['status'] = 'error'
                 response['errorcode'] = status.HTTP_400_BAD_REQUEST
                 response['reason'] = "Amount, Broker, and brokerUserId are required fileds!!!"
@@ -427,7 +429,7 @@ class CheezeePayUPIPayIN(APIView):
                 "merchantId": os.environ['CHEEZEE_PAY_MERCHANT_ID'],
                 "mchOrderNo": str(ordRec.orderId).replace("-", ''),
                 "paymentMode": "P2P",
-                "amount": amount,
+                "amount": amountWithFees,
                 "name": str(ordRec.full_name),
                 "timestamp": str(int(time.time() * 1000)),
                 "notifyUrl": CHEEZEE_PAYIN_WEBHOOK,
@@ -458,7 +460,7 @@ class CheezeePayUPIPayIN(APIView):
 
                 payload = {
                     "brokerUserId": brokerUserId,
-                    "amount": int(amount),
+                    "amount": int(usdAmount * 100),
                     "method": "Crypto",
                     "comment": "Deposit for Trading Account",
                     "commentForUser": "Deposit for Trading Account",
