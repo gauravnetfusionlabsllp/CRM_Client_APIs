@@ -1,0 +1,27 @@
+Match2Pay callback received: {
+  "depositAddress": "THY6WDeDJoPoh6na8NtYyCDXgiQNwQzhvb",
+  "cryptoTransactionInfo": [
+    {
+      "txid": "hash",
+      "confirmations": 1,
+      "amount": 50.0,
+      "transactionCurrency": "USX",
+      "confirmedTime": "Nov 5, 2025 12:19:33 PM",
+      "status": "DONE",
+      "processingFee": 0.0,
+      "conversionRate": 1.0,
+      "blockchainType": "TRON"
+    }
+  ],
+  "paymentId": "a72aecdf-49f8-4284-ae46-3c616e3786d3",
+  "status": "DONE",
+  "transactionAmount": 50.0,
+  "netAmount": 50.0,
+  "transactionCurrency": "USX",
+  "processingFee": 0.0,
+  "finalAmount": 50.0,
+  "finalCurrency": "USD",
+  "conversionRate": 1.0
+}
+Transaction hash confirmed. Final amount: 50.0 USD
+[05/Nov/2025 17:49:57] "POST /payment/match2pay-pay-in-webhook/ HTTP/1.1" 200 16
