@@ -9,7 +9,7 @@ account_sid = os.environ['TWILIO_ACCOUNT_SID']
 auth_token = os.environ['TWILIO_AUTH_TOKEN']
 client = Client(account_sid, auth_token)
 
-def send_text_message():
+def send_text_message(phoneNo):
     try:
         message = client.messages(
             body = "This is Testing Message!!!",
@@ -18,7 +18,12 @@ def send_text_message():
         )
 
         print(message, "--------------------150")
-        return message
+
+        if not message:
+            return False
+
+        return True
+    
     except Exception as e:
         print(f"Error in Sending message from the Twilio: {str(e)}")
         return False
