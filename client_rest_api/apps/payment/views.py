@@ -169,10 +169,11 @@ class JenaPayPayIn(APIView):
 
             data = request.data.get('data')
             amount = data.get('amount')
+            amountWithFees = data.get('amountWithFees')
             authToken = request.headers.get('Auth-Token')
-            brokesrUserId = data.get('brokesrUserId')
+            brokerUserId = data.get('brokerUserId')
 
-            if not all([amount, authToken, brokesrUserId]):
+            if not all([amount, authToken, brokerUserId, amountWithFees]):
                 response['status'] = 'error'
                 response['errorcode'] = status.HTTP_400_BAD_REQUEST
                 response['reason'] = "Amount, Broker and brokerUserId are required fileds!!!"
@@ -209,17 +210,17 @@ class JenaPayPayIn(APIView):
                 userId = str(userData.get('user_id')),
                 full_name = str(userData.get('full_name')),
                 email = str(userData.get('email')),
-                brokerUserId = str(brokesrUserId),
+                brokerUserId = str(brokerUserId),
                 amount = amount,
                 pspName = "JenaPay"
             )
 
             # if userIdData:
 
-            amount = str(amount) + '.00'
+            amountWithFees = str(amountWithFees) + '.00'
             order = {
                 "number": str(ordRec.orderId).replace('-',''),
-                "amount": str(amount),
+                "amount": str(amountWithFees),
                 "currency": "USD",
                 "description": "Amount for the Trading"
             }
@@ -272,7 +273,7 @@ class JenaPayPayIn(APIView):
             }
 
             payload = {
-                "brokerUserId": brokesrUserId,
+                "brokerUserId": brokerUserId,
                 "amount": int(float(amount))*100,
                 "method": 19,
                 "comment": "Deposit for Trading Account",
@@ -329,10 +330,13 @@ class JenaPayPayInCallBack(APIView):
  
             print(order_number,"-----------150")
             orderId = str(uuid.UUID(order_number))
-            orderData = OrderDetails.objects.get(orderId = orderId)
+            orderData = (
+                    OrderDetails.objects
+                    .get(orderId=orderId)
+                )
             print(orderData, "---------------")
 
-            if orderData.status in ["SUCCESS"]:
+            if orderData.status == "SUCCESS":
                 return Response({"code": "200", "msg": "Already processed"}, status=status.HTTP_200_OK)
             
             payload = {
@@ -395,7 +399,8 @@ class CheezeePayUPIPayIN(APIView):
             query = """
                 SELECT 
                     u.full_name, 
-                    u.email, 
+                    u.email,
+                    u.telephone,
                     u.id AS user_id
                 FROM crmdb.auth_tokens AS t
                 JOIN crmdb.users AS u 
@@ -438,7 +443,7 @@ class CheezeePayUPIPayIN(APIView):
                 "returnUrl": "https://trader.sgfx.com/sign-in",
                 "language": "en",
                 "email": str(ordRec.email),
-                "phone": "+911234567890"
+                "phone": str(userData.get('telephone'))
             }
 
             payload['sign'] = get_sign(payload, MerchantPrivateKey)
@@ -539,61 +544,62 @@ class CheezeePayInCallBackWebhook(APIView):
             orderData = OrderDetails.objects.get(orderId = orderId)
             print(orderData, "----------------------Order")
 
-            if orderData.status in ["SUCCESS"]:
+            if orderData.status == "SUCCESS":
                 return Response({"code": "200", "msg": "Already processed"}, status=status.HTTP_200_OK)
 
-            time.sleep(3)
-            cursor = connection.cursor(dictionary=True)
+            # time.sleep(3)
+            # cursor = connection.cursor(dictionary=True)
 
-            query = """
-                    SELECT bb.* 
-                    FROM crmdb.broker_banking AS bb 
-                    WHERE bb.psp_transaction_id = %s and bb.broker_user_id = %s and bb.user_id = %s
-                """
+            # query = """
+            #         SELECT bb.* 
+            #         FROM crmdb.broker_banking AS bb 
+            #         WHERE bb.psp_transaction_id = %s and bb.broker_user_id = %s and bb.user_id = %s
+            #     """
 
-            params = (str(mchOrderNo),int(orderData.brokerUserId),int(orderData.userId))
-            print(params,"-----------------------------258")
+            # params = (str(mchOrderNo),int(orderData.brokerUserId),int(orderData.userId))
+            # print(params,"-----------------------------258")
 
-            cursor.execute(query, params)
-            row = cursor.fetchone()
-            print(row,"-----------------------------Row")
-            if row:
-                brokerBankingId = row['id']
-                print(brokerBankingId, "-----------------------250")
-            else:
-                print("No record found for this PSP Transaction ID")
-                return Response({"code": "400", "msg": "failed"}, status=status.HTTP_200_OK)
+            # cursor.execute(query, params)
+            # row = cursor.fetchone()
+            # print(row,"-----------------------------Row")
+            # if row:
+            #     brokerBankingId = row['id']
+            #     print(brokerBankingId, "-----------------------250")
+            # else:
+            #     print("No record found for this PSP Transaction ID")
+            #     return Response({"code": "400", "msg": "failed"}, status=status.HTTP_200_OK)
 
-            if orderData.brokerBankingId == str(brokerBankingId):
-                print("testing------------------500")
+            # if orderData.brokerBankingId == str(brokerBankingId):
+            #     print("testing------------------500")
             
-                payload = {
-                    "brokerBankingId": brokerBankingId,
-                    "method" : "Crypto",
-                    "comment": "Deposit for Trading Account Approved",
-                    "pspTransactionId" : str(mchOrderNo),
-                    "decisionTime" : int(datetime.now().timestamp() * 1000)
-                }
+            payload = {
+                "brokerBankingId":  orderData.brokerBankingId,
+                "method" : 17,
+                "comment": "Deposit for Trading Account Approved",
+                "pspTransactionId" : str(mchOrderNo),
+                "decisionTime" : int(datetime.now().timestamp() * 1000)
+            }
 
-                header = {
-                    "Content-Type": "application/json",
-                    "x-crm-api-token": "c6420f81-d146-44c1-807c-2462f9210361"
-                }
-                    
-                crmRes = requests.post("https://apicrm.sgfx.com/SignalsCRM//crm-api/brokers/bankings/deposit/approve", json=payload, headers=header).json()
+            header = {
+                "Content-Type": "application/json",
+                "x-crm-api-token": "c6420f81-d146-44c1-807c-2462f9210361"
+            }
+                
+            crmRes = requests.post("https://apicrm.sgfx.com/SignalsCRM//crm-api/brokers/bankings/deposit/approve", json=payload, headers=header).json()
 
-                os.makedirs("crm_logs", exist_ok=True)
-                filename = f"crm_logs/crm_response_{orderData.orderId}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+            os.makedirs("crm_logs", exist_ok=True)
+            filename = f"crm_logs/crm_response_{orderData.orderId}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
 
-                with open(filename, "w", encoding="utf-8") as f:
-                    json.dump(crmRes, f, indent=4, ensure_ascii=False)
+            with open(filename, "w", encoding="utf-8") as f:
+                json.dump(crmRes, f, indent=4, ensure_ascii=False)
 
-                if crmRes.get('success'):
-                    orderData.status = "SUCCESS"
-                    orderData.tradingId = str(crmRes['result']['brokerUserExternalId'])
-                    orderData.save()
-                    print("--------------------Successs")
-                    return Response({"code": "200", "msg": "success"}, status=status.HTTP_200_OK)
+            if crmRes.get('success'):
+                orderData.transactionId = str(platOrderNo)
+                orderData.status = "SUCCESS"
+                orderData.tradingId = str(crmRes['result']['brokerUserExternalId'])
+                orderData.save()
+                print("--------------------Successs")
+                return Response({"code": "200", "msg": "success"}, status=status.HTTP_200_OK)
             
             
             return Response({"code": "400", "status": "failed"}, status=status.HTTP_200_OK)
