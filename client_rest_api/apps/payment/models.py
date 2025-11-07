@@ -22,6 +22,7 @@ class OrderDetails(TimeStampModel):
     full_name = models.CharField(max_length=250, null=True, blank=True)
     email = models.CharField(max_length=250, null=True, blank=True)
     brokerUserId = models.CharField(max_length=150, null=True, blank=True)
+    transactionId = models.CharField(max_length=250, unique=True, blank=True, null=True)
     orderId = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     amount = models.CharField(max_length=150, unique=False, null=True, blank=True)
     status = models.CharField(max_length = 150, choices=STATUS_CHOICES, default='PENDING')
