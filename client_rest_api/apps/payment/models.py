@@ -16,15 +16,17 @@ class TimeStampModel(models.Model):
 class OrderDetails(TimeStampModel):
     STATUS_CHOICES = [
         ('PENDING', 'Pending'),
-        ('SUCCESS', 'Success')
+        ('SUCCESS', 'Success'),
+        ('CANCELLED', 'Cancelled')
     ]
     userId = models.CharField(max_length=150, null=True, blank=True)
     full_name = models.CharField(max_length=250, null=True, blank=True)
     email = models.CharField(max_length=250, null=True, blank=True)
     brokerUserId = models.CharField(max_length=150, null=True, blank=True)
-    transactionId = models.CharField(max_length=250, unique=True, blank=True, null=True)
+    transactionId = models.CharField(max_length=250, unique=False, blank=True, null=True, default=None)
     orderId = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
+    order_type = models.CharField(max_length = 250,  null=True, default=None)
     status = models.CharField(max_length = 150, choices=STATUS_CHOICES, default='PENDING')
     tradingId = models.CharField(max_length=150, null=True, blank=True)
     brokerBankingId = models.CharField(max_length=150, null=True, blank=True)

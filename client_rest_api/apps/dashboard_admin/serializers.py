@@ -21,7 +21,8 @@ class WithdrawalApprovalSerializer(serializers.ModelSerializer):
             "second_approval_action",
             "second_approval_at",
             "second_approval_note",
-            "transectionID"
+            "brokerBankingId",
+            "ordertransactionid"
         ]
         read_only_fields = [
             "first_approval_by",
