@@ -396,7 +396,7 @@ class WithdrawalRequest(APIView):
                         try:
                             psp_response = psp.payout(approval)
                             print("PSP Response:", psp_response)
-                            if isinstance(psp_response, dict) and psp_response.get("success") is True:
+                            if isinstance(psp_response, dict) and psp_response.get("success") is True or psp_response.get('msg') == "success":
                                 response_message["psp_payout"] = "Payout Successful!"
                                 print("✅ Payout Successful!")
                             elif isinstance(psp_response, dict) and psp_response.get("success") is False:
@@ -535,7 +535,7 @@ class Match2PayPayInWebHook(APIView):
 
 # ----------------------------Jena PAY-------------------------------------------
 class JenaPayPayIn(APIView):
-
+    @check_and_update_user_category
     def post(self, request):
         try:
             response = {"status": "success", "errorcode": "", "reason": "", "result":"", "httpstatus": status.HTTP_200_OK}
@@ -585,8 +585,9 @@ class JenaPayPayIn(APIView):
                 email = str(userData.get('email')),
                 brokerUserId = str(brokerUserId),
                 amount = amount,
-                pspName = "JenaPay"
-            )
+                pspName = "JenaPay",
+                order_type = "deposit"
+             )
 
             # if userIdData:
 
@@ -801,7 +802,8 @@ class CheezeePayUPIPayIN(APIView):
                 email = str(userData.get('email')),
                 brokerUserId = str(brokerUserId),
                 amount = amount,
-                pspName = "CheezeePay UPI"
+                pspName = "CheezeePay UPI",
+                order_type = "deposit"
             )
             
             # print(CHEEZEE_PAYIN_WEBHOOK, "------------------------------")
@@ -921,30 +923,6 @@ class CheezeePayInCallBackWebhook(APIView):
             if orderData.status == "SUCCESS":
                 return Response({"code": "200", "msg": "Already processed"}, status=status.HTTP_200_OK)
 
-            # time.sleep(3)
-            # cursor = connection.cursor(dictionary=True)
-
-            # query = """
-            #         SELECT bb.* 
-            #         FROM crmdb.broker_banking AS bb 
-            #         WHERE bb.psp_transaction_id = %s and bb.broker_user_id = %s and bb.user_id = %s
-            #     """
-
-            # params = (str(mchOrderNo),int(orderData.brokerUserId),int(orderData.userId))
-            # print(params,"-----------------------------258")
-
-            # cursor.execute(query, params)
-            # row = cursor.fetchone()
-            # print(row,"-----------------------------Row")
-            # if row:
-            #     brokerBankingId = row['id']
-            #     print(brokerBankingId, "-----------------------250")
-            # else:
-            #     print("No record found for this PSP Transaction ID")
-            #     return Response({"code": "400", "msg": "failed"}, status=status.HTTP_200_OK)
-
-            # if orderData.brokerBankingId == str(brokerBankingId):
-            #     print("testing------------------500")
             
             payload = {
                 "brokerBankingId":  orderData.brokerBankingId,
@@ -990,7 +968,6 @@ class CheezeePayInCallBackWebhook(APIView):
 
 
 class CheezeePayUPIPayOut(APIView):
-
     def post(self, request):
         try:
             
@@ -998,12 +975,20 @@ class CheezeePayUPIPayOut(APIView):
 
             data = request.data.get('data')
             amount = float(data.get("amount"))
-           
+
+            account_infos = {
+                "name": "testing",
+                "accountNumber": "12345678901",
+                "ifscCode" : "SBIN00247573",
+                "accountType": "saving",
+                "banckName": "SBI",
+                "branchName": "Mumbai Branch" 
+            }
             payload = {
                 "appId": os.environ['CHEEZEE_PAY_APP_ID'],
                 "merchantsId": os.environ['CHEEZEE_PAY_MERCHANT_ID'],
                 "mchOrderNo": str(uuid.uuid4()).replace('-',''),  # your order ID
-                "paymentMethod": "P2P_UPI",
+                "paymentMethod": "BANK_IN",
                 "amount": amount,
                 "name": "Test",
                 "email": "test@gmail.com",
@@ -1012,7 +997,7 @@ class CheezeePayUPIPayOut(APIView):
                 "language": "en",
                 "timestamp": str(int(time.time() * 1000))
             }
-
+            payload['payeeAccountInfos'] = account_infos
             payload['platSign'] = get_sign(payload, MerchantPrivateKey)
 
             url = os.environ['PAYOUT_URL']
@@ -1023,12 +1008,47 @@ class CheezeePayUPIPayOut(APIView):
                     
                     return Response(resp, status=status.HTTP_200_OK)
 
-
-            return Response({"Error":resp}, status=status.HTTP_400_BAD_REQUEST)
+            response['status'] = 'error'
+            response['errorcode'] = status.HTTP_400_BAD_REQUEST
+            response['reason'] = "Withdrawal request got failed!!!"
+            response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+            return Response(response, status=response.get('httpstatus'))
         
         except Exception as e:
-            print(f"Error in the Crypto PayOut Order: {str(e)}")
-            return Response({"status":"error"}, status=status.HTTP_400_BAD_REQUEST)
+            print(f"Error in the CheezeePay PayOut Order: {str(e)}")
+            response['status'] = 'error'
+            response['errorcode'] = status.HTTP_400_BAD_REQUEST
+            response['reason'] = str(e)
+            response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+            return Response(response, status=response.get('httpstatus'))
+        
+@method_decorator(csrf_exempt, name="dispatch")
+class CheezeePayOutWebhook(APIView):
+
+    parser_classes = [JSONParser]
+
+    def post(self, request):
+        try:
+            response = {"status": "success", "errorcode": "", "reason": "", "result": "", "httpstatus": status.HTTP_200_OK}
+            param_map = request.data
+
+            if not verify_sign(param_map, PlatformPublicKey):
+                response['status'] = "error"
+                response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                response['reason'] = "Invalid Signature!!"
+                response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                return Response(response, status=response.get('httpstatus'))
+            
+
+
+        except Exception as e:
+            print(f"Error in the Cheezee Pay Webhook Call : {str(e)}")
+            response['status'] = 'error'
+            response['errorcode'] = status.HTTP_400_BAD_REQUEST
+            response['reason'] = str(e)
+            response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+            return Response(response, status=response.get('httpstatus'))
+
 
 
         
