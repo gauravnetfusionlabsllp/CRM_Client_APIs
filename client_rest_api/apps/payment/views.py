@@ -302,7 +302,7 @@ class WithdrawalRequest(APIView):
                         "email" : __data["email"],
                         "brokerUserId" : __data["brokerUserId"],
                         "transactionId" : crmRes.get("result").get("id"),
-                        "amount" : __data["usdAmount"],
+                        "amount" : __data["usdAmount"] if __data.get("pspName") == "cheezepay" else __data["amount"],
                         "order_type" : "withdrawal",
                         "status" : 'PENDING',
                         "tradingId" : crmRes.get("result").get("brokerUserExternalId"),
@@ -343,8 +343,8 @@ class WithdrawalRequest(APIView):
         try:
             response = {"status": "success", "errorcode": "", "reason": "", "result":"", "httpstatus": status.HTTP_200_OK}
             __data = request.data.get('data')
-            amountWithFees = data.get('amountWithFees')
-            usdAmount = data.get('usdAmount')
+            amountWithFees = __data.get('amountWithFees')
+            usdAmount = __data.get('usdAmount')
             if __data:
                 response_message = {}
                 serializer = WithdrawalApprovalActionSerializer(data=request.data)
@@ -476,15 +476,15 @@ class WithdrawalRequest(APIView):
                                 "error": str(e)
                             }
 
-                        # crmRes = crm_api.verify_withdrawal(approval.brokerBankingId)
-                        # print("crmRes", crmRes)
-                        if not crmRes.get("success"):
-                            response['errorcode'] = status.HTTP_400_BAD_REQUEST
-                            response['httpstatus'] = response['errorcode']
-                            response['reason'] = str(crmRes["result"])
-                        else :
-                            print("------------------250")
-                            response_message['crm_api'] = "Withdrawal request hase been Successfully Completed On CRM!!"
+                        # # crmRes = crm_api.verify_withdrawal(approval.brokerBankingId)
+                        # # print("crmRes", crmRes)
+                        # if not crmRes.get("success"):
+                        #     response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                        #     response['httpstatus'] = response['errorcode']
+                        #     response['reason'] = str(crmRes["result"])
+                        # else :
+                        #     print("------------------250")
+                        #     response_message['crm_api'] = "Withdrawal request hase been Successfully Completed On CRM!!"
                         response_message["api_response"] = f"Withdrawal {pk} approved in stage 2 ✅ (FINAL)"
                         response["result"] = response_message
                     else:

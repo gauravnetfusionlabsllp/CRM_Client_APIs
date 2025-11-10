@@ -21,25 +21,44 @@ print("CRM_AUTH_TOKEN", CRM_AUTH_TOKEN)
 class CRM:
     def initial_withdrawal(self, data):
         userid = data["userId"]
+        print(data)
 
         getUserDataQuery = f"SELECT * FROM users where id={userid}"
         userData = DBConnection._forFetchingJson(getUserDataQuery, using='replica')
         userData = userData[0]
 
-        usdAmount = int(data.get('usdAmount'))
-        fees = float(data.get('amountWithFees')) - float(data.get('amount'))
+        # ✅ Only use usdAmount if present
+        usdAmount = data.get("usdAmount")
+        usdAmount = float(usdAmount) if usdAmount is not None else 0.0
+
+        # ✅ Safe amount
+        amount = data.get("amount")
+        amount = float(amount) if amount is not None else 0.0
+
+        # ✅ Safe amountWithFees
+        amount_with_fees = data.get("amountWithFees")
+        amount_with_fees = float(amount_with_fees) if amount_with_fees is not None else amount
+
+        # ✅ Fee calculation safe
+        fees = amount_with_fees - amount
+
+        # ✅ Amount logic depending on PSP
+        if data.get("pspName") == "match2pay":
+            final_amount = int(amount * 100)
+        else:
+            final_amount = int(usdAmount * 100)
 
         payload = {
             "brokerUserId": data.get("brokerUserId"),
-            "amount": int(data.get("amount") * 100) if data.get('pspName') == "match2pay" else int(usdAmount * 100),
-            "fee": int(fees),
+            "amount": final_amount,
+            "fee": 0,
             "withdrawalSubType": 1,
             "comment": "Manual bank withdrawal",
             "commentForUser": "Your withdrawal is being processed",
             "pspId": 13 if data.get('pspName') == 'match2pay' else 11,
             "status": "PendingManualApproval",
-            "normalizedAmount": int(data.get("amount") * 100) if data.get('pspName') == "match2pay" else int(usdAmount) * 100,
-            "decisionTime":  int(datetime.now().timestamp() * 1000),
+            "normalizedAmount": final_amount,
+            "decisionTime": int(datetime.now().timestamp() * 1000),
             "caseNumber": "NA",
             "iban": "NA",
             "bankName": "NA",
@@ -53,6 +72,7 @@ class CRM:
             "registeredName": userData.get("full_name"),
             "blockedFromManualApproval": False
         }
+
         print("Payload", payload)
 
         try:
