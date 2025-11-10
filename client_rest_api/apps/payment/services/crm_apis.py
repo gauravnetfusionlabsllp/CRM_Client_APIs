@@ -68,14 +68,14 @@ class CRM:
             print(f"Exception occurred: {e}")
             return {'success': False }
     
-    def verify_withdrawal(self, withdrawalID):
+    def verify_withdrawal(self, withdrawalID, method, transactioId, pspId):
         payload = {
             "brokerBankingId": withdrawalID,
-            "method": "Crypto",
+            "method": method,
             "comment": "Testing",
-            "pspTransactionId": str(uuid.uuid4()),
-            "pspId": 12,
-            "decisionTime": int(time.time())
+            "pspTransactionId": transactioId,
+            "pspId": pspId,
+            "decisionTime": int(datetime.now().timestamp() * 1000)
         }
         print("Payload", payload)
 

@@ -6,6 +6,7 @@ from apps.payment.constant.cheesee_pay_key_constant import PlatformPublicKey, Me
 
 from apps.core.DBConnection import *
 
+CHEEZEE_PAYOUT_WEBHOOK = os.environ['CHEEZEE_PAYOUT_WEBHOOK']
 
 import time
 from dotenv import load_dotenv
@@ -41,6 +42,7 @@ class CheezePayPSP:
             __user_data = DBConnection._forFetchingJson(query, using='replica')
             __user_data = __user_data[0]
 
+            print(data.ordertransaction.orderId, "---------------150")
             account_infos = {
                     "name": __user_data.get('full_name'),
                     "upiId": data.walletAddress
@@ -48,12 +50,12 @@ class CheezePayPSP:
             payload = {
                 "appId": os.environ['CHEEZEE_PAY_APP_ID'],
                 "merchantsId": os.environ['CHEEZEE_PAY_MERCHANT_ID'],
-                "mchOrderNo": str(data.ordertransaction.orderId),
+                "mchOrderNo": str(data.ordertransaction.orderId).replace("-",""),
                 "paymentMethod": "P2P_UPI",
                 "amount": amount,
                 "name": __user_data.get('full_name'),
                 "email": __user_data.get('email'),
-                "notifyUrl": "",
+                "notifyUrl": CHEEZEE_PAYOUT_WEBHOOK,
                 "payeeAccountInfos": account_infos,
                 "language": "en",
                 "timestamp": str(int(time.time() * 1000))
