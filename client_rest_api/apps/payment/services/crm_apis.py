@@ -69,7 +69,7 @@ class CRM:
     
     def verify_withdrawal(self, withdrawalID):
         payload = {
-            "brokerBankingId": withdrawalID,
+            "brokerBankingId": int(withdrawalID),
             "method": "Crypto",
             "comment": "Testing",
             "pspTransactionId": str(uuid.uuid4()),
@@ -79,7 +79,7 @@ class CRM:
         print("Payload", payload)
 
         try:
-            response = requests.post(str(CRM_MANUAL_WITHDRAWAL_CANCEL_URL), json=payload ,headers=headers)
+            response = requests.post(str(CRM_MANUAL_WITHDRAWAL_APPROVE_URL), json=payload ,headers=headers)
             if response.status_code == 200:
                 print("Withdrawal request sent successfully!")
                 return response.json()

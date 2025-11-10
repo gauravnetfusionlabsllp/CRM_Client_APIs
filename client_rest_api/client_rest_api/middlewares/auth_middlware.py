@@ -4,7 +4,7 @@ from apps.core.DBConnection import *
 class AuthTokenMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
-        self.whitelist = [ '/admin', '/static', '/media', '/users' ]
+        self.whitelist = [ '/admin', '/static', '/media', '/users' , '/payment/match2pay-pay-out-webhook/']
 
     def __call__(self, request):
         if any(request.path.startswith(w) for w in self.whitelist):

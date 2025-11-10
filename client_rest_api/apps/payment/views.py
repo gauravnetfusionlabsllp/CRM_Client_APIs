@@ -89,11 +89,12 @@ class Match2PayPayIn(APIView):
         try:
             request_body = request.data.get('data')
             amount = request_body.get('amount')
-            # authToken = request.headers.get('Auth-Token')
-            authToken = request_body.get('Auth-Token')
+            authToken = request.headers.get('Auth-Token')
+            # authToken = request_body.get('Auth-Token')
             brokerUserId = request_body.get('brokerUserId')
-            print([amount, authToken, brokerUserId])
-            if not all([amount, authToken, brokerUserId]):
+
+            print([amount, brokerUserId])
+            if not all([amount, brokerUserId]):
                 response['status'] = 'error'
                 response['errorcode'] = status.HTTP_400_BAD_REQUEST
                 response['reason'] = "Amount, Broker and brokerUserId are required fileds!!!"
@@ -204,7 +205,7 @@ class Match2PayPayIn(APIView):
                                     }
                             crm_payload = {
                                         "brokerUserId": brokerUserId,
-                                        "amount": int(amount * 100),
+                                        "amount": int(amount),
                                         "method": "Crypto",
                                         "comment": "Deposit for Trading Account",
                                         "commentForUser": "Deposit for Trading Account",
@@ -234,7 +235,10 @@ class Match2PayPayIn(APIView):
                             {"error": "Invalid JSON response_data from Match2Pay", "raw": response_data.text},
                             status=status.HTTP_400_BAD_REQUEST
                         )
-                response['result'] = response_data.json()
+                
+                data = response_data.json()
+                data["cashierLink"] = data['checkoutUrl']
+                response['result'] = data
                 return JsonResponse(response, status=status.HTTP_200_OK)
             else:
                 print(serializer.errors)
@@ -277,16 +281,11 @@ class WithdrawalRequest(APIView):
             response = {"status": "success", "errorcode": "", "reason": "", "result":"", "httpstatus": status.HTTP_200_OK}
             __data = request.data.get('data')
             user_id = request.session_user
-
             __data["userId"] = user_id
-
             if __data:
-
                 crmRes = crm_api.initial_withdrawal(__data)
-                print(__data)
-                print("crmRes ================================", crmRes)
+                print("crmRes: ", crmRes)
                 if not crmRes.get("success"):
-                    
                     response['errorcode'] = status.HTTP_400_BAD_REQUEST
                     response['httpstatus'] = response['errorcode']
                     response['reason'] = str(crmRes["result"])
@@ -296,7 +295,6 @@ class WithdrawalRequest(APIView):
                         "full_name" : "test_name",
                         "email" : __data["email"],
                         "brokerUserId" : __data["brokerUserId"],
-                        "transactionId" : crmRes.get("result").get("id"),
                         "amount" : __data["amount"],
                         "order_type" : "withdrawal",
                         "status" : 'PENDING',
@@ -305,7 +303,6 @@ class WithdrawalRequest(APIView):
                         "pspName" : "Match2Pay",
                         
                     }
-                    print(order_payload)
                     order_seializer = OrderDetailsSerializer(data=order_payload)
                     if order_seializer.is_valid():
                         instance = order_seializer.save()
@@ -319,7 +316,6 @@ class WithdrawalRequest(APIView):
                 serializer = WithdrawalApprovalSerializer(data=__data)
                 if serializer.is_valid():
                     serializer.save()
-                    
                 else:
                     response['status'] = 'error'
                     response['errorcode'] = status.HTTP_400_BAD_REQUEST
@@ -376,7 +372,6 @@ class WithdrawalRequest(APIView):
                         response['reason'] = str("Transaction approved.")
                     else:
                         crmRes = crm_api.cancel_withdrawal(approval.brokerBankingId)
-                        print("crmRes", crmRes)
                         if not crmRes.get("success"):
                             response['errorcode'] = status.HTTP_400_BAD_REQUEST
                             response['httpstatus'] = response['errorcode']
@@ -442,6 +437,20 @@ class WithdrawalRequest(APIView):
                             return Response(response, status=400)
                         try:
                             psp_response = psp.payout(approval)
+                            data = psp_response.json()
+                            payment_id = data.get("paymentId")   # ✅ extract paymentId
+                            if payment_id:
+                                # ✅ get the related order
+                                order = approval.ordertransactionid  
+                                if order:
+                                    order.transactionId = payment_id
+                                    order.save()
+                                    print("✅ Saved paymentId to OrderDetails:", payment_id)
+                                else:
+                                    print("⚠ No related order found for this withdrawal.")
+                            else:
+                                print("⚠ PSP response missing paymentId:", data)
+                            print("PSP Response JSON:", data)
                             print("PSP Response:", psp_response)
                             if isinstance(psp_response, dict) and psp_response.get("success") is True:
                                 response_message["psp_payout"] = "Payout Successful!"
@@ -470,14 +479,6 @@ class WithdrawalRequest(APIView):
                                 "error": str(e)
                             }
 
-                        crmRes = crm_api.verify_withdrawal(approval.brokerBankingId)
-                        # print("crmRes", crmRes)
-                        if not crmRes.get("success"):
-                            response['errorcode'] = status.HTTP_400_BAD_REQUEST
-                            response['httpstatus'] = response['errorcode']
-                            response['reason'] = str(crmRes["result"])
-                        else :
-                            response_message['crm_api'] = "Withdrawal request hase been Successfully Completed On CRM!!"
                         response_message["api_response"] = f"Withdrawal {pk} approved in stage 2 ✅ (FINAL)"
                         response["result"] = response_message
                     else:
@@ -498,6 +499,88 @@ class WithdrawalRequest(APIView):
             response['httpstatus'] = status.HTTP_400_BAD_REQUEST
             return Response(response, status=response.get('httpstatus'))
 
+class Match2PayPayOutWebHook(APIView):
+    def post(self, request):
+        try:
+            data = json.loads(request.body.decode("utf-8"))
+            print("✅ Payout Webhook Received:", json.dumps(data, indent=2))
+        except json.JSONDecodeError:
+            return HttpResponseBadRequest("Invalid JSON")
+
+        # -----------------------------
+        # ✅ Extract important fields
+        # -----------------------------
+        payment_id = data.get("paymentId")                       # tempTransactionId = paymentId
+        status = data.get("status")                              # DONE or PENDING
+        final_amount = data.get("finalAmount")
+        final_currency = data.get("finalCurrency")
+
+        crypto_tx_info = data.get("cryptoTransactionInfo", [])
+        tx_info = crypto_tx_info[0] if crypto_tx_info else {}
+        txid = tx_info.get("txid")
+        confirmations = tx_info.get("confirmations")
+
+        # -----------------------------
+        # ✅ Locate order record
+        # -----------------------------
+        try:
+            order = OrderDetails.objects.get(transactionId=payment_id)
+        except OrderDetails.DoesNotExist:
+            print("❌ No order found for paymentId:", payment_id)
+            return JsonResponse({"status": "ok"})
+
+        # -----------------------------
+        # ✅ Handle PENDING status
+        # -----------------------------
+        if status == "PENDING":
+            print(f"⏳ Payout {txid} pending with {confirmations} confirmations.")
+            # You may store pending status in DB if needed
+            return JsonResponse({"status": "ok"})
+
+        # -----------------------------
+        # ✅ Handle DONE (Completed)
+        # -----------------------------
+        if status == "DONE":
+            print(f"✅ Payout {txid} DONE. Final Amount: {final_amount} {final_currency}")
+
+            # ✅ Update OrderDetails → SUCCESS
+            serializer = OrderDetailsSerializer(order, data={"status": "SUCCESS"}, partial=True)
+            if serializer.is_valid():
+                try:
+                    serializer.save()
+                except Exception as e:
+                    print("❌ Error saving order:", e)
+            else:
+                print("Serializer Errors:", serializer.errors)
+
+            # -----------------------------
+            # ✅ Notify CRM (Withdrawal Approve)
+            # -----------------------------
+            payload = {
+                "brokerBankingId": int(order.brokerBankingId),
+                "method": "Crypto",
+                "comment": "Withdrawal Sent Successfully",
+                "pspTransactionId": str(payment_id),
+                "pspId": 12,
+                "decisionTime": int(time.time())
+            }
+            print(order.brokerBankingId)
+            crmRes = crm_api.verify_withdrawal(int(order.brokerBankingId))
+            print("crmRes: ", crmRes)
+            if not crmRes.get("success"):
+                print("ERROR in verify_withdrawal Match2PayPayOutWebHook")
+            else :
+                print("Withdrawal request hase been Successfully Completed On CRM!!")
+
+            return JsonResponse({"status": "ok"})
+        # -----------------------------
+        # ✅ Other statuses
+        # -----------------------------
+        print("ℹ️ Status:", status, "- no action performed")
+
+        return JsonResponse({"status": "ok"})
+
+        
 
 class Match2PayPayInWebHook(APIView):
     def post(self, request):

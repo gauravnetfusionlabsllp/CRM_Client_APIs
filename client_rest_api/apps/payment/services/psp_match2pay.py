@@ -8,7 +8,7 @@ MATCH2PAY_PAYIN_URL = os.environ.get('MATCH2PAY_PAYIN_URL')
 MATCH2PAY_PAYOUT_URL = os.environ.get('MATCH2PAY_PAYOUT_URL')
 MATCH2PAY_API_SECRETE = os.environ.get('MATCH2PAY_API_SECRETE')
 MATCH2PAY_PAY_API_TOKEN = os.environ.get('MATCH2PAY_PAY_API_TOKEN')
-MATCH2PAY_CALLBACK_URL = os.environ.get('MATCH2PAY_CALLBACK_URL')
+MATCH2PAY_PAYOUT_CALLBACK_URL = os.environ.get('MATCH2PAY_PAYOUT_CALLBACK_URL')
 MATCH2PAY_FAILURE_URL = os.environ.get('MATCH2PAY_FAILURE_URL')
 MATCH2PAY_SUCCESS_URL = os.environ.get('MATCH2PAY_SUCCESS_URL')
 
@@ -49,7 +49,7 @@ class Match2PayPSP:
             request_body = {
                 "amount": int(__data.amount),
                 "apiToken": MATCH2PAY_PAY_API_TOKEN,
-                "callbackUrl": MATCH2PAY_CALLBACK_URL,
+                "callbackUrl": MATCH2PAY_PAYOUT_CALLBACK_URL,
                 "currency": "USD",
                 "cryptoAddress": str(__data.walletAddress),  # 🔹 Replace with actual USDT TRC20 wallet address
                 "customer": {
