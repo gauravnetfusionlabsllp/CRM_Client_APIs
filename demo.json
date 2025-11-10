@@ -1,0 +1,25 @@
+{
+    "event":"jena-pay-pay-in",
+    "data": {
+    "amount": 50,
+    "customer": {
+        "firstName": "firstName_4da0af01617c",
+        "lastName": "lastName_801eb285edd1",
+        "address": {
+            "address": "address_52c10ed842fb",
+            "city": "city_62da6faaeb17",
+            "country": "country_a6be7ed127cc",
+            "zipCode": "zipCode_3e168862ef49",
+            "state": "state_b8d531055c90"
+        },
+        "contactInformation": {
+            "email": "gauravwarise04@gmail.com",
+            "phoneNumber": "9579834493"
+        },
+        "locale": "en_US",
+        "dateOfBirth": "dateOfBirth_338c08d95dd6",
+        "tradingAccountLogin": "clientId_d6811bff2963",
+        "tradingAccountUuid": "clientUid_56b798ba2ae2"
+    }
+}
+}

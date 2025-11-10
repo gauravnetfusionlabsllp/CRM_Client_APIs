@@ -64,7 +64,7 @@ class VerifyUserPhoneNumber(APIView):
 
     def post(self, request):
         try:
-            response = {"status": "success", "errorcode": "", "reason": "", "result": "", "httpstatus": status.HTTP_400_BAD_REQUEST}
+            response = {"status": "success", "errorcode": "", "reason": "", "result": "", "httpstatus": status.HTTP_200_OK}
 
             data = request.data.get('data')
             phoneNo = data.get('phoneNo')
@@ -237,6 +237,8 @@ class ExtractDocumentData(APIView):
                 serializer = RegistrationLogSerializer(data=result.get('result'))
                 if serializer.is_valid():
                     serializer.save()
+                else:
+                    print(serializer.error)
             os.remove(tmp_path)
 
             # 5️⃣ Return result from helper

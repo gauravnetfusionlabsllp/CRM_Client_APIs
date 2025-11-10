@@ -22,8 +22,9 @@ class OrderDetails(TimeStampModel):
     full_name = models.CharField(max_length=250, null=True, blank=True)
     email = models.CharField(max_length=250, null=True, blank=True)
     brokerUserId = models.CharField(max_length=150, null=True, blank=True)
+    transactionId = models.CharField(max_length=250, unique=True, blank=True, null=True)
     orderId = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
-    amount = models.CharField(max_length=150, unique=False, null=True, blank=True)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
     status = models.CharField(max_length = 150, choices=STATUS_CHOICES, default='PENDING')
     tradingId = models.CharField(max_length=150, null=True, blank=True)
     brokerBankingId = models.CharField(max_length=150, null=True, blank=True)
@@ -37,3 +38,16 @@ class OrderDetails(TimeStampModel):
         verbose_name = "Order Details"
         verbose_name_plural = "Order Detail"
         db_table = "OrderDetails"
+
+class Userpermissions(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    created_at = models.DateTimeField()
+    updated_at = models.DateTimeField()
+    userid = models.CharField(db_column='userId', max_length=150, blank=True, null=True)  # Field name made lowercase.
+    email = models.CharField(max_length=150, blank=True, null=True)
+    min_visible_amount = models.IntegerField()
+    max_visible_amount = models.IntegerField()
+
+    class Meta:
+        managed = False
+        db_table = 'UserPermissions'
