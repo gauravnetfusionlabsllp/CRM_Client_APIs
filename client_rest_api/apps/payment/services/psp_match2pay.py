@@ -19,7 +19,7 @@ CRM_AUTH_TOKEN = os.environ.get('CRM_AUTH_TOKEN')
 class Match2PayPSP:
     BASE_URL = "url"
 
-    def payout(self, approval ):
+    def payout(self, approval, amountWithFees=None):
         print("Match2PayPSP: called")
         response = {"status": "success", "errorcode": "", "reason": "", "result":"", "httpstatus": status.HTTP_200_OK}
         try:

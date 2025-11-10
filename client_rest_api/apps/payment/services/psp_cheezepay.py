@@ -1,20 +1,78 @@
 import requests
+import os
+from rest_framework import status
+from apps.payment.helpers.payment_signature_creater_helpers import get_sign, verify_sign
+from apps.payment.constant.cheesee_pay_key_constant import PlatformPublicKey, MerchantPrivateKey, headers
+
+from apps.core.DBConnection import *
+
+
+import time
+from dotenv import load_dotenv
+load_dotenv()
 
 class CheezePayPSP:
     BASE_URL = "url"
 
-    def payout(self, approval):
+    def payout(self, approval, amountWithFees):
         print("CheezePayPSP: called")
-        # payload = {
-        #     "amount": approval.amount,
-        #     "currency": approval.currency,
-        #     "walletAddress": approval.walletAddress,
-        #     "referenceId": approval.id,
-        # }
+        try:
+            response = {"status": "success", "errorcode": "", "reason": "", "result": "", "httpstatus": status.HTTP_200_OK}
 
-        # headers = {
-        #     "Authorization": "Bearer BINANCE_API_KEY"
-        # }
+            data = approval
+            amount = float(amountWithFees)
 
-        # r = requests.post(self.BASE_URL, json=payload, headers=headers)
-        # return r.json()
+            query =f"""
+                SELECT
+                u.id, 
+                u.first_name, 
+                u.last_name, 
+                u.full_name, 
+                u.address, 
+                u.country_iso, 
+                u.city, 
+                u.state, 
+                u.zip, 
+                u.email, 
+                u.telephone, 
+                u.id AS user_id
+                FROM crmdb.users AS u where u.id={data.userId} and u.email='{data.email}'
+            """
+            __user_data = DBConnection._forFetchingJson(query, using='replica')
+            __user_data = __user_data[0]
+
+            account_infos = {
+                    "name": __user_data.get('full_name'),
+                    "upiId": data.walletAddress
+                }
+            payload = {
+                "appId": os.environ['CHEEZEE_PAY_APP_ID'],
+                "merchantsId": os.environ['CHEEZEE_PAY_MERCHANT_ID'],
+                "mchOrderNo": str(data.ordertransaction.orderId),
+                "paymentMethod": "P2P_UPI",
+                "amount": amount,
+                "name": __user_data.get('full_name'),
+                "email": __user_data.get('email'),
+                "notifyUrl": "",
+                "payeeAccountInfos": account_infos,
+                "language": "en",
+                "timestamp": str(int(time.time() * 1000))
+            }
+            payload['platSign'] = get_sign(payload, MerchantPrivateKey)
+
+            url = os.environ['PAYOUT_URL']
+            resp = requests.post(url, json=payload, headers=headers).json()
+            print(resp,"---------------------------250")
+            # return resp
+            if resp.get("code") == "0000000":
+                if verify_sign(resp, PlatformPublicKey):
+                    print(resp,"-------------------------------150")
+                    return resp
+        
+        except Exception as e:
+            print(f"Error in the CheezeePay PayOut Order: {str(e)}")
+            return False
+            
+
+
+        
