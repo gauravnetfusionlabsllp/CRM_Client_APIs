@@ -14,13 +14,13 @@ load_dotenv()
 class CheezePayPSP:
     BASE_URL = "url"
 
-    def payout(self, approval):
+    def payout(self, approval, amountWithFees):
         print("CheezePayPSP: called")
         try:
             response = {"status": "success", "errorcode": "", "reason": "", "result": "", "httpstatus": status.HTTP_200_OK}
 
             data = approval
-            amount = float(data.amount)
+            amount = float(amountWithFees)
 
             query =f"""
                 SELECT
@@ -66,7 +66,7 @@ class CheezePayPSP:
             # return resp
             if resp.get("code") == "0000000":
                 if verify_sign(resp, PlatformPublicKey):
-                    
+                    print(resp,"-------------------------------150")
                     return resp
         
         except Exception as e:

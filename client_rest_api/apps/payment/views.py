@@ -9,6 +9,8 @@ from apps.payment.constant.cheesee_pay_key_constant import PlatformPublicKey, Me
 
 import threading
 
+from decimal import Decimal
+
 import time
 import os
 import requests
@@ -61,6 +63,8 @@ print(JENA_PAY_PAYIN_WEBHOOK_URL,"--------------------------")
 
 CHEEZEE_PAY_RETURN_URL = os.environ.get('CHEEZEE_PAY_RETURN_URL')
 CHEEZEE_PAYIN_WEBHOOK = os.environ.get('CHEEZEE_PAYIN_WEBHOOK')
+
+CRM_MANUAL_WITHDRAWAL_URL = os.environ.get('CRM_MANUAL_WITHDRAWAL_URL')
 
 # -----------------------------DB Connectiosn----------------------------
 
@@ -295,16 +299,16 @@ class WithdrawalRequest(APIView):
                 else :
                     order_payload = {
                         "userId" :  user_id,
-                        "full_name" : "test_name",
+                        "full_name" : __data.get('full_name', "test"),
                         "email" : __data["email"],
                         "brokerUserId" : __data["brokerUserId"],
                         "transactionId" : crmRes.get("result").get("id"),
-                        "amount" : __data["amount"],
+                        "amount" : __data["usdAmount"],
                         "order_type" : "withdrawal",
                         "status" : 'PENDING',
                         "tradingId" : crmRes.get("result").get("brokerUserExternalId"),
                         "brokerBankingId" : crmRes.get("result").get("id"),
-                        "pspName" : "Match2Pay",
+                        "pspName" : __data.get('pspName'),
                         
                     }
                     print(order_payload)
@@ -318,6 +322,8 @@ class WithdrawalRequest(APIView):
                     response['result'] = "Withdrawal request hase been sent to admin...!!"
 
                 __data["brokerBankingId"] = crmRes.get("result").get("id")
+                if __data.get("pspName") == "cheezepay":
+                    __data["amount"] = __data.get("usdAmount")
                 serializer = WithdrawalApprovalSerializer(data=__data)
                 if serializer.is_valid():
                     serializer.save()
@@ -340,6 +346,8 @@ class WithdrawalRequest(APIView):
         try:
             response = {"status": "success", "errorcode": "", "reason": "", "result":"", "httpstatus": status.HTTP_200_OK}
             __data = request.data.get('data')
+            amountWithFees = data.get('amountWithFees')
+            usdAmount = data.get('usdAmount')
             if __data:
                 response_message = {}
                 serializer = WithdrawalApprovalActionSerializer(data=request.data)
@@ -443,7 +451,7 @@ class WithdrawalRequest(APIView):
                             response['httpstatus'] = status.HTTP_400_BAD_REQUEST
                             return Response(response, status=400)
                         try:
-                            psp_response = psp.payout(approval)
+                            psp_response = psp.payout(approval, amountWithFees)
                             print("PSP Response:", psp_response)
                             if isinstance(psp_response, dict) and psp_response.get("success") is True or psp_response.get('msg') == "success":
                                 response_message["psp_payout"] = "Payout Successful!"
@@ -472,13 +480,14 @@ class WithdrawalRequest(APIView):
                                 "error": str(e)
                             }
 
-                        crmRes = crm_api.verify_withdrawal(approval.brokerBankingId)
+                        # crmRes = crm_api.verify_withdrawal(approval.brokerBankingId)
                         # print("crmRes", crmRes)
                         if not crmRes.get("success"):
                             response['errorcode'] = status.HTTP_400_BAD_REQUEST
                             response['httpstatus'] = response['errorcode']
                             response['reason'] = str(crmRes["result"])
                         else :
+                            print("------------------250")
                             response_message['crm_api'] = "Withdrawal request hase been Successfully Completed On CRM!!"
                         response_message["api_response"] = f"Withdrawal {pk} approved in stage 2 ✅ (FINAL)"
                         response["result"] = response_message
@@ -1016,61 +1025,6 @@ class CheezeePayInCallBackWebhook(APIView):
 
 
 
-class CheezeePayUPIPayOut(APIView):
-    def post(self, request):
-        try:
-            
-            response = {"status": "success", "errorcode": "", "reason": "", "result": "", "httpstatus": status.HTTP_200_OK}
-
-            data = request.data.get('data')
-            amount = float(data.get("amount"))
-
-            account_infos = {
-                "name": "testing",
-                "accountNumber": "12345678901",
-                "ifscCode" : "SBIN00247573",
-                "accountType": "saving",
-                "banckName": "SBI",
-                "branchName": "Mumbai Branch" 
-            }
-            payload = {
-                "appId": os.environ['CHEEZEE_PAY_APP_ID'],
-                "merchantsId": os.environ['CHEEZEE_PAY_MERCHANT_ID'],
-                "mchOrderNo": str(uuid.uuid4()).replace('-',''),  # your order ID
-                "paymentMethod": "BANK_IN",
-                "amount": amount,
-                "name": "Test",
-                "email": "test@gmail.com",
-                "notifyUrl": "",
-                "payeeAccountInfos": {},
-                "language": "en",
-                "timestamp": str(int(time.time() * 1000))
-            }
-            payload['payeeAccountInfos'] = account_infos
-            payload['platSign'] = get_sign(payload, MerchantPrivateKey)
-
-            url = os.environ['PAYOUT_URL']
-            resp = requests.post(url, json=payload, headers=headers).json()
-
-            if resp.get("code") == "0000000":
-                if verify_sign(resp, PlatformPublicKey):
-                    
-                    return Response(resp, status=status.HTTP_200_OK)
-
-            response['status'] = 'error'
-            response['errorcode'] = status.HTTP_400_BAD_REQUEST
-            response['reason'] = "Withdrawal request got failed!!!"
-            response['httpstatus'] = status.HTTP_400_BAD_REQUEST
-            return Response(response, status=response.get('httpstatus'))
-        
-        except Exception as e:
-            print(f"Error in the CheezeePay PayOut Order: {str(e)}")
-            response['status'] = 'error'
-            response['errorcode'] = status.HTTP_400_BAD_REQUEST
-            response['reason'] = str(e)
-            response['httpstatus'] = status.HTTP_400_BAD_REQUEST
-            return Response(response, status=response.get('httpstatus'))
-        
 @method_decorator(csrf_exempt, name="dispatch")
 class CheezeePayOutWebhook(APIView):
 
@@ -1089,6 +1043,7 @@ class CheezeePayOutWebhook(APIView):
                 return Response(response, status=response.get('httpstatus'))
             
 
+            return Response({"status": "success"}, status=status.HTTP_200_OK)
 
         except Exception as e:
             print(f"Error in the Cheezee Pay Webhook Call : {str(e)}")
@@ -1097,6 +1052,147 @@ class CheezeePayOutWebhook(APIView):
             response['reason'] = str(e)
             response['httpstatus'] = status.HTTP_400_BAD_REQUEST
             return Response(response, status=response.get('httpstatus'))
+
+
+# class CheezeePayUPIPayOut(APIView):
+
+#     def get(self, request):
+#         try:
+#             response = {"status":"error", "errorcode": "", "reason": "", "result": "", "httpstatus": status.HTTP_200_OK}
+
+#             data = request.data.get('data')
+#             userId =  int(data.get('userId'))
+#             brokerUserId = data.get('brokerUserId')
+#             amount = float(data.get('brokerUserId'))
+#             amountWithFees = float(data.get('amountWithFees'))
+#             usdAmount = data.get('usdAmount')
+
+#             getUserDataQuery = f"SELECT * FROM users where id={userId}"
+#             userData = DBConnection._forFetchingData(getUserDataQuery, using='replica')
+#             userData = userData[0]
+
+#             fee = amountWithFees - amount
+
+#             orderRec = OrderDetails.objects.create(
+#                     userId = str(userData.get('user_id')),
+#                     full_name = str(userData.get('full_name')),
+#                     email = str(userData.get('email')),
+#                     brokerUserId = str(brokerUserId),
+#                     amount = amount,
+#                     pspName = "CheezeePay",
+#                     order_type = "withdrawal"
+#                 )
+
+#             payload = {
+#                 "brokerUserId": brokerUserId,
+#                 "amount": int(usdAmount * 100),
+#                 "fee": fee,
+#                 "withdrawalSubType": 1,
+#                 "comment": "Manual bank withdrawal",
+#                 "commentForUser": "Your withdrawal is being processed",
+#                 "pspId": 12,
+#                 "status": "PendingManualApproval",
+#                 "normalizedAmount": int(data.get("amount")),
+#                 "decisionTime": int(time.time()),
+#                 "caseNumber": "WD-2025-1122",
+#                 "iban": "AE070331234567890123456",
+#                 "bankName": "Emirates NBD",
+#                 "bankSwiftCode": "EBILAEAD",
+#                 "caseOrigin": "Backoffice",
+#                 "withdrawalPurpose": "Personal funds withdrawal",
+#                 "accountHolderName": userData.get("full_name"),
+#                 "bankCountry": "AE",
+#                 "paymentCurrency": "USD",
+#                 "registeredEmail": userData.get("email"),
+#                 "registeredName": userData.get("full_name"),
+#                 "blockedFromManualApproval": False
+#             }
+
+#             header = {
+#                 "Content-Type": "application/json",
+#                 "x-crm-api-token": str(CRM_AUTH_TOKEN)
+#             }
+
+            
+#             resp = requests.post(CRM_MANUAL_WITHDRAWAL_URL, json=payload, headers=header).json()
+#             if resp.status_code == 200:
+#                 orderRec.save()
+
+#                 WithdrawalApprovals.objects.create(
+#                     userId = str(userData.get('user_id')),
+#                     brokerUserId = str(brokerUserId),
+#                     email = str(userData.get('email')),
+#                     amount = Decimal(amount)
+#                 )
+
+#                 response['result'] = "Withdrawal request sent successfully!"
+
+
+
+#         except Exception as e:
+#             print(f"Error in the Sending the Withdrawal Pending Request: {str(e)}")
+#             response['status'] = 'error'
+#             response['errorcode'] = status.HTTP_400_BAD_REQUEST
+#             response['reason'] = str(e)
+#             response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+#             return Response(response, status=response.get('httpstatus'))
+
+
+#     def post(self, request):
+#         try:
+            
+#             response = {"status": "success", "errorcode": "", "reason": "", "result": "", "httpstatus": status.HTTP_200_OK}
+
+#             data = request.data.get('data')
+#             amount = float(data.get("amount"))
+
+#             account_infos = {
+#                 "name": "testing",
+#                 "accountNumber": "12345678901",
+#                 "ifscCode" : "SBIN00247573",
+#                 "accountType": "saving",
+#                 "banckName": "SBI",
+#                 "branchName": "Mumbai Branch" 
+#             }
+#             payload = {
+#                 "appId": os.environ['CHEEZEE_PAY_APP_ID'],
+#                 "merchantsId": os.environ['CHEEZEE_PAY_MERCHANT_ID'],
+#                 "mchOrderNo": str(uuid.uuid4()).replace('-',''),  # your order ID
+#                 "paymentMethod": "BANK_IN",
+#                 "amount": amount,
+#                 "name": "Test",
+#                 "email": "test@gmail.com",
+#                 "notifyUrl": "",
+#                 "payeeAccountInfos": {},
+#                 "language": "en",
+#                 "timestamp": str(int(time.time() * 1000))
+#             }
+#             payload['payeeAccountInfos'] = account_infos
+#             payload['platSign'] = get_sign(payload, MerchantPrivateKey)
+
+#             url = os.environ['PAYOUT_URL']
+#             resp = requests.post(url, json=payload, headers=headers).json()
+
+#             if resp.get("code") == "0000000":
+#                 if verify_sign(resp, PlatformPublicKey):
+                    
+#                     return Response(resp, status=status.HTTP_200_OK)
+
+#             response['status'] = 'error'
+#             response['errorcode'] = status.HTTP_400_BAD_REQUEST
+#             response['reason'] = "Withdrawal request got failed!!!"
+#             response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+#             return Response(response, status=response.get('httpstatus'))
+        
+#         except Exception as e:
+#             print(f"Error in the CheezeePay PayOut Order: {str(e)}")
+#             response['status'] = 'error'
+#             response['errorcode'] = status.HTTP_400_BAD_REQUEST
+#             response['reason'] = str(e)
+#             response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+#             return Response(response, status=response.get('httpstatus'))
+        
+
 
 
 

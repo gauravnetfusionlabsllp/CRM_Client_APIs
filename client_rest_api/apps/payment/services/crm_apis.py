@@ -4,6 +4,7 @@ import json
 from apps.core.DBConnection import *
 import time
 import  uuid
+from datetime import datetime
 
 CRM_AUTH_TOKEN = os.environ.get('CRM_AUTH_TOKEN')
 CRM_MANUAL_WITHDRAWAL_URL = os.environ.get('CRM_MANUAL_WITHDRAWAL_URL')
@@ -25,28 +26,28 @@ class CRM:
         userData = DBConnection._forFetchingJson(getUserDataQuery, using='replica')
         userData = userData[0]
 
-        print("userData", userData)
-        print("data", data)
+        usdAmount = int(data.get('usdAmount'))
+        fees = float(data.get('amountWithFees')) - float(data.get('amount'))
 
         payload = {
             "brokerUserId": data.get("brokerUserId"),
-            "amount": int(data.get("amount") * 100),
-            "fee": 5,
+            "amount": int(data.get("amount") * 100) if data.get('pspName') == "match2pay" else int(usdAmount * 100),
+            "fee": int(fees),
             "withdrawalSubType": 1,
             "comment": "Manual bank withdrawal",
             "commentForUser": "Your withdrawal is being processed",
-            "pspId": 12,
+            "pspId": 13 if data.get('pspName') == 'match2pay' else 11,
             "status": "PendingManualApproval",
-            "normalizedAmount": int(data.get("amount")),
-            "decisionTime": int(time.time()),
-            "caseNumber": "WD-2025-1122",
-            "iban": "AE070331234567890123456",
-            "bankName": "Emirates NBD",
-            "bankSwiftCode": "EBILAEAD",
-            "caseOrigin": "Backoffice",
+            "normalizedAmount": int(data.get("amount") * 100) if data.get('pspName') == "match2pay" else int(usdAmount) * 100,
+            "decisionTime":  int(datetime.now().timestamp() * 1000),
+            "caseNumber": "NA",
+            "iban": "NA",
+            "bankName": "NA",
+            "bankSwiftCode": "NA",
+            "caseOrigin": "NA",
             "withdrawalPurpose": "Personal funds withdrawal",
             "accountHolderName": userData.get("full_name"),
-            "bankCountry": "AE",
+            "bankCountry": "NA",
             "paymentCurrency": "USD",
             "registeredEmail": userData.get("email"),
             "registeredName": userData.get("full_name"),
