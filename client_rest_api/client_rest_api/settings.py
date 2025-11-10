@@ -75,6 +75,7 @@ INSTALLED_APPS = [
     'apps.payment',
     'apps.core',
     'apps.users',
+    'apps.dashboard_admin',
     'rest_framework',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -94,6 +95,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'client_rest_api.middlewares.auth_middlware.AuthTokenMiddleware',
 ]
 
 ROOT_URLCONF = 'client_rest_api.urls'

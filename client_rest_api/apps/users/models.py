@@ -11,10 +11,10 @@ class RegistrationLog(models.Model):
     first_name = models.CharField(max_length=150, blank=True, null=True)
     last_name = models.CharField(max_length=150, blank=True, null=True)
     full_name = models.CharField(max_length=300, blank=True, null=True)
-    email = models.EmailField(blank=True, null=True)
+    email = models.EmailField(blank=True, null=True, unique=True)
     dob = models.CharField(max_length=20, blank=True, null=True)          # or DateField
     id_number = models.CharField(max_length=150, blank=True, null=True)
-    address = models.TextField(blank=True, null=True)
+    address = models.JSONField(blank=True, null=True)
     issue_date = models.CharField(max_length=20, blank=True, null=True)   # or DateField
     expiry_date = models.CharField(max_length=20, blank=True, null=True)  # or DateField
     confidence_notes = models.TextField(blank=True, null=True)

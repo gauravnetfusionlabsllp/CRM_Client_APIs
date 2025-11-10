@@ -19,7 +19,7 @@ def send_text_message(phoneNo):
         client = Client(account_sid, auth_token)
      
         message = client.messages.create(
-            body = f"Kindly Verify Your OTP: !!! {otp}",
+            body = f"verify OTP!!! {otp}",
             from_ = "+12175831441",
             to = formatNo
         )
