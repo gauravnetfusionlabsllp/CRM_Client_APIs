@@ -17,4 +17,5 @@ urlpatterns = [
    # --------------------------Webhook---------------------------
 
    path('cheezeepay-upi-payin-webhook/', views.CheezeePayInCallBackWebhook.as_view(), name='cheezeepay-upi-payin-webhook'),
+   path('jenapay-payin-webhook/', views.JenaPayPayInCallBack.as_view(), name="jenapay-payin-webhook"),
 ]

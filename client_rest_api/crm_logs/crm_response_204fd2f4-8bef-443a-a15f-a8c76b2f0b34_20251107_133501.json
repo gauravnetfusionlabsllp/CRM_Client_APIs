@@ -1,0 +1,6 @@
+{
+    "error": null,
+    "result": "The deposit request failed - Cannot approve a deposit with status other than 'Pending'",
+    "requestId": "5ae0afd4-fcf1-48cb-a006-54c3d6752434",
+    "success": false
+}
