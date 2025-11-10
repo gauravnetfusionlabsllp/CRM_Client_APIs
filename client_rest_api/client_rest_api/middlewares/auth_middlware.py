@@ -27,6 +27,7 @@ class AuthTokenMiddleware:
 
         request.auth_token = auth_token
         request.session_user = session[0].get("user_id")
+        # request.session_user_name = session[0].get("full_name")
 
         response = self.get_response(request)
         return response

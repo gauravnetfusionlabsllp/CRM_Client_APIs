@@ -51,5 +51,5 @@ class DynamicUserTokenMiddleware:
                 status=401
             )
 
-        # ✅ Token is valid → allow request
+        # Token is valid allow request
         return self.get_response(request)
