@@ -1120,8 +1120,41 @@ class CheezeePayOutWebhook(APIView):
                 response['httpstatus'] = status.HTTP_400_BAD_REQUEST
                 return Response(response, status=response.get('httpstatus'))
             
+            merchantId = param_map.get("merchantId")
+            mchOrderNo = param_map.get("mchOrderNo")
+            platOrderNo = param_map.get("platOrderNo")
+            orderStatus = param_map.get("orderStatus")
+            payAmount = param_map.get("payAmount")
+            amountCurrency = param_map.get("amountCurrency")
+            fee = param_map.get("fee")
+            feeCurrency = param_map.get("feeCurrency")
+            payer_upi_id = param_map.get("payerUpiId", "")
+            gmt_end = param_map.get("gmtEnd")
 
-            return Response({"status": "success"}, status=status.HTTP_200_OK)
+            orderId = str(uuid.UUID(mchOrderNo))
+            orderData = OrderDetails.objects.get(orderId = orderId)
+
+            if orderData.status == "SUCCESS":
+                return Response({"code": "200", "msg": "Already processed"}, status=status.HTTP_200_OK)
+            
+
+            crmRes = crm_api.verify_withdrawal(
+                int(orderData.brokerBankingId),
+                method=17,
+                transactionId=str(mchOrderNo),
+                pspId=11
+            )
+            
+            if crmRes.get('success'):
+                orderData.transactionId = str(platOrderNo)
+                orderData.status = "SUCCESS"
+                orderData.tradingId = str(crmRes['result']['brokerUserExternalId'])
+                orderData.save()
+                print("--------------------Successs")
+                return Response({"code": "200", "msg": "success"}, status=status.HTTP_200_OK)
+            
+            
+            return Response({"code": "400", "status": "failed"}, status=status.HTTP_200_OK)
 
         except Exception as e:
             print(f"Error in the Cheezee Pay Webhook Call : {str(e)}")
