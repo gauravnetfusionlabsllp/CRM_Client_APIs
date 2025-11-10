@@ -285,15 +285,39 @@ class WithdrawalRequest(APIView):
             if __data:
 
                 crmRes = crm_api.initial_withdrawal(__data)
-                print("crmRes", crmRes)
+                print(__data)
+                print("crmRes ================================", crmRes)
                 if not crmRes.get("success"):
+                    
                     response['errorcode'] = status.HTTP_400_BAD_REQUEST
                     response['httpstatus'] = response['errorcode']
                     response['reason'] = str(crmRes["result"])
                 else :
+                    order_payload = {
+                        "userId" :  user_id,
+                        "full_name" : "test_name",
+                        "email" : __data["email"],
+                        "brokerUserId" : __data["brokerUserId"],
+                        "transactionId" : crmRes.get("result").get("id"),
+                        "amount" : __data["amount"],
+                        "order_type" : "withdrawal",
+                        "status" : 'PENDING',
+                        "tradingId" : crmRes.get("result").get("brokerUserExternalId"),
+                        "brokerBankingId" : crmRes.get("result").get("id"),
+                        "pspName" : "Match2Pay",
+                        
+                    }
+                    print(order_payload)
+                    order_seializer = OrderDetailsSerializer(data=order_payload)
+                    if order_seializer.is_valid():
+                        instance = order_seializer.save()
+                        created_id = instance.id
+                        __data['ordertransactionid'] = created_id
+                    else:
+                        print("ERROR in saving data in order_seializer withdrawal request: ", str(order_seializer.errors))
                     response['result'] = "Withdrawal request hase been sent to admin...!!"
 
-                __data["transectionID"] = crmRes.get("result").get("id")
+                __data["brokerBankingId"] = crmRes.get("result").get("id")
                 serializer = WithdrawalApprovalSerializer(data=__data)
                 if serializer.is_valid():
                     serializer.save()
@@ -349,12 +373,24 @@ class WithdrawalRequest(APIView):
                     approval.first_approval_at = timezone.now()
                     approval.save()
 
-                    response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                    response['errorcode'] = status.HTTP_200_OK
                     if action:
                         response['reason'] = str("Transaction approved.")
                     else:
+                        crmRes = crm_api.cancel_withdrawal(approval.brokerBankingId)
+                        print("crmRes", crmRes)
+                        if not crmRes.get("success"):
+                            response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                            response['httpstatus'] = response['errorcode']
+                            response['reason'] = str(crmRes["result"])
+                        else :
+                            order = approval.ordertransactionid
+                            if order:
+                                order.status = "CANCELLED"
+                                order.save()
+                            response_message['crm_api'] = "Withdrawal request hase been declined!!"
                         response['reason'] = str("Transaction declined.")
-                        response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                        response['httpstatus'] = status.HTTP_200_OK
                     return Response(response, status=response.get("httpstatus"))
 
 
@@ -378,6 +414,19 @@ class WithdrawalRequest(APIView):
 
                     # ✅ If second stage NOT approved → STOP here
                     if not action:
+                        crmRes = crm_api.cancel_withdrawal(approval.brokerBankingId)
+                        # print("crmRes", crmRes)
+                        if not crmRes.get("success"):
+                            response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                            response['httpstatus'] = response['errorcode']
+                            response['reason'] = str(crmRes["result"])
+                        else :
+                            order = approval.ordertransactionid
+                            if order:
+                                order.status = "CANCELLED"
+                                order.save()
+                            response_message['crm_api'] = "Withdrawal request hase been declined!!"
+
                         response['status'] = 'error'
                         response['errorcode'] = status.HTTP_200_OK
                         response['reason'] = str("Transaction declined.")
@@ -423,7 +472,7 @@ class WithdrawalRequest(APIView):
                                 "error": str(e)
                             }
 
-                        crmRes = crm_api.verify_withdrawal(approval.transectionID)
+                        crmRes = crm_api.verify_withdrawal(approval.brokerBankingId)
                         # print("crmRes", crmRes)
                         if not crmRes.get("success"):
                             response['errorcode'] = status.HTTP_400_BAD_REQUEST
