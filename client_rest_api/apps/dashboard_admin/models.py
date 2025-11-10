@@ -1,5 +1,6 @@
 from django.db import models
 import uuid
+from apps.payment.models import OrderDetails
 
 # Create your models here.
 class TimeStampModel(models.Model):
@@ -40,7 +41,8 @@ class WithdrawalApprovals(TimeStampModel):
     second_approval_action = models.BooleanField(default=False,help_text="Whether the first approval was accepted (True) or rejected (False).")
     second_approval_at = models.DateTimeField(null=True,blank=True,help_text="Timestamp of second approval.")
     second_approval_note = models.CharField(null=True,blank=True,help_text="Message of second approval.")
-    transectionID = models.CharField(max_length=150, null=False, blank=False)
+    brokerBankingId = models.CharField(max_length=150, null=False, blank=False)
+    ordertransactionid = models.ForeignKey(OrderDetails, null=True, blank=True, on_delete=models.CASCADE)
 
     def __str__(self):
         return str(self.userId)
