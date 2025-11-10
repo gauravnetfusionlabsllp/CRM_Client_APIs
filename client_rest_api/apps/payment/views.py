@@ -33,6 +33,8 @@ import mysql.connector
 import uuid
 import json
 
+from apps.payment.constant.change_user_category_constant import check_and_update_user_category
+
 
 # ---------------Jena Pay--------------------------
 
@@ -377,6 +379,7 @@ class JenaPayPayInCallBack(APIView):
 
 class CheezeePayUPIPayIN(APIView):
 
+    # @method_decorator(check_and_update_user_category)
     def post(self, request):
         try:
             response = {"status": "success", "errorcode": "", "reason": "", "result": "", "httpstatus": status.HTTP_200_OK}
