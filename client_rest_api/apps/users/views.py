@@ -237,6 +237,8 @@ class ExtractDocumentData(APIView):
                 serializer = RegistrationLogSerializer(data=result.get('result'))
                 if serializer.is_valid():
                     serializer.save()
+                else:
+                    print(serializer.error)
             os.remove(tmp_path)
 
             # 5️⃣ Return result from helper

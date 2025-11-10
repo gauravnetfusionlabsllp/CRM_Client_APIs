@@ -28,10 +28,18 @@ load_dotenv()
 from django.http import JsonResponse, HttpResponseBadRequest
 
 from apps.core.serializers import PaymentRequestSerializer
+from apps.payment.serializers import *
+from apps.dashboard_admin.serializers import *
+from apps.core.DBConnection import *
+from apps.payment.services.psp_router import PSPRouter
 import mysql.connector
 
 import uuid
 import json
+from django.utils import timezone
+from .utils.decorators import check_user_permissions
+from .services.crm_apis import CRM
+
 
 from apps.payment.constant.change_user_category_constant import check_and_update_user_category
 
@@ -73,12 +81,87 @@ MATCH2PAY_CALLBACK_URL = os.environ.get('MATCH2PAY_CALLBACK_URL')
 MATCH2PAY_FAILURE_URL = os.environ.get('MATCH2PAY_FAILURE_URL')
 MATCH2PAY_SUCCESS_URL = os.environ.get('MATCH2PAY_SUCCESS_URL')
 
+CRM_MANUAL_DEPOSIT_URL = os.environ.get('CRM_MANUAL_DEPOSIT_URL')
+CRM_MANUAL_DEPOSIT_APPROVE_URL = os.environ.get('CRM_MANUAL_DEPOSIT_APPROVE_URL')
+CRM_AUTH_TOKEN = os.environ.get('CRM_AUTH_TOKEN')
+
 class Match2PayPayIn(APIView):
     def post(self, request):
         response = {"status": "success", "errorcode": "", "reason": "", "result":"", "httpstatus": status.HTTP_200_OK}
         try:
             request_body = request.data.get('data')
-            serializer = PaymentRequestSerializer(data=request_body)
+            amount = request_body.get('amount')
+            # authToken = request.headers.get('Auth-Token')
+            authToken = request_body.get('Auth-Token')
+            brokerUserId = request_body.get('brokerUserId')
+            print([amount, authToken, brokerUserId])
+            if not all([amount, authToken, brokerUserId]):
+                response['status'] = 'error'
+                response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                response['reason'] = "Amount, Broker and brokerUserId are required fileds!!!"
+                response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                return Response(response, status=response.get('httpstatus'))
+
+            query =f"""
+                SELECT 
+                    u.id, 
+                    u.first_name, 
+                    u.last_name, 
+                    u.full_name, 
+                    u.address, 
+                    u.country_iso, 
+                    u.city, 
+                    u.state, 
+                    u.zip, 
+                    u.email, 
+                    u.telephone, 
+                    u.id AS user_id
+                FROM crmdb.auth_tokens AS t
+                JOIN crmdb.users AS u 
+                    ON u.id = t.user_id
+                WHERE 
+                    t.auth_token = '{authToken}'
+                    AND t.user_id IS NOT NULL
+            """
+
+            data = DBConnection._forFetchingJson(query, using='replica')
+            data = data[0]
+            trading_info_query =f"""
+                                select id, external_id, user_id from crmdb.broker_user where id={brokerUserId}
+                                """
+            print(trading_info_query)
+            trading_info_data = DBConnection._forFetchingJson(trading_info_query, using='replica')
+            trading_info_data = trading_info_data[0]
+            print(trading_info_data)
+
+            payment_payload = {
+                "amount":amount,
+                "customer":{
+                            "firstName":str(data.get('first_name')) if data.get('first_name') else 'default',
+                            "lastName":str(data.get('last_name')) if data.get('last_name') else 'default',
+                            "address":{
+                                "address": data.get('address') if data.get('address') else 'default',
+                                "city": data.get('city') if data.get('city') else 'default',
+                                "country": data.get('country_iso') if data.get('country_iso') else 'default',
+                                "zipCode": data.get('zip') if data.get('zip') else 'default',
+                                "state": data.get('state') if data.get('state') else 'default'
+                            },
+                            "contactInformation":{
+                                "email":data.get('email') if data.get('email') else 'default',
+                                "phoneNumber":data.get('telephone') if data.get('telephone') else 'default'
+                            },
+                            "locale":data.get('country_iso') if data.get('country_iso') else 'default',
+                            "dateOfBirth": "dateOfBirth_338c08d95dd6",
+                            "tradingAccountLogin": trading_info_data.get('external_id') if data.get('external_id') else 'default',
+                            "tradingAccountUuid": data.get('id') if data.get('id') else 'default'
+
+                        }
+            }
+            print(payment_payload)
+
+
+            # request_body = request.data.get('data')
+            serializer = PaymentRequestSerializer(data=payment_payload)
             if serializer.is_valid():
                 # print(serializer.validated_data)
                 serialized_data = serializer.validated_data
@@ -98,14 +181,62 @@ class Match2PayPayIn(APIView):
                     headers=headers,
                     data=json.dumps(serialized_data)
                 )
-                try:
-                    data = response_data.json()
-                except ValueError:
-                    return Response(
-                        {"error": "Invalid JSON response_data from Match2Pay", "raw": response_data.text},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-                response['result'] = data
+                print(response_data)
+                if response_data.json().get("status"):
+                    try:
+                        # data = response_data.json()
+                        # store the order details in db =====================
+                        if response_data.json():
+                            payload = {
+                                "userId": data.get('id'),
+                                "full_name": data.get('full_name'),
+                                "email": data.get('email'),
+                                "brokerUserId": brokerUserId,
+                                "transactionId": response_data.json().get("paymentId"), 
+                                "amount": amount,
+                                "pspName": "Match2Pay",
+                                "tradingId":trading_info_data.get("external_id"),
+                                "brokerBankingId":trading_info_data.get("id"),
+                            }
+                            
+                            # send order request to antilope =====================
+                            header = {
+                                        "Content-Type": "application/json",
+                                        "x-crm-api-token": str(CRM_AUTH_TOKEN)
+                                    }
+                            crm_payload = {
+                                        "brokerUserId": brokerUserId,
+                                        "amount": int(amount * 100),
+                                        "method": "Crypto",
+                                        "comment": "Deposit for Trading Account",
+                                        "commentForUser": "Deposit for Trading Account",
+                                        "pspId": 13,
+                                        "pspTransactionId": response_data.json().get("paymentId"),
+                                        "status": "Pending",
+                                        "normalizedAmount": int(amount),
+                                        "decisionTime": 0,
+                                        "declineReason": "Manual",
+                                        "brandExternalId": response_data.json().get("paymentId")
+                                    }
+                            crmRes = requests.post(str(CRM_MANUAL_DEPOSIT_URL), json=crm_payload, headers=header).json()
+                            if crmRes['result']['success']:
+                                payload['brokerBankingId'] = str(crmRes['result']['result']['id'])
+                                print(payload)
+                                serializer = OrderDetailsSerializer(data = payload)
+                                if serializer.is_valid():
+                                    serializer.save()
+                                else:
+                                    print("ERROR in saving data in OrderDetailsSerializer: ", str(serializer.errors))
+
+                                print("============== data hase been sent to the antilop =====================")
+
+
+                    except ValueError:
+                        return Response(
+                            {"error": "Invalid JSON response_data from Match2Pay", "raw": response_data.text},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                response['result'] = response_data.json()
                 return JsonResponse(response, status=status.HTTP_200_OK)
             else:
                 print(serializer.errors)
@@ -113,6 +244,212 @@ class Match2PayPayIn(APIView):
         except Exception as e:
             print("ERROR in Match2PayPayIn: ", str(e))
         return JsonResponse(response, status=status.HTTP_200_OK)
+
+crm_api = CRM()
+
+
+class WithdrawalRequest(APIView):
+    @check_user_permissions
+    def get(self, request):
+        print("request.min_visible_amount", request.min_visible_amount)
+        print("request.max_visible_amount", request.max_visible_amount)
+        try:
+            response = {"status": "success", "errorcode": "", "reason": "", "result":"", "httpstatus": status.HTTP_200_OK}
+            approvals = WithdrawalApprovals.objects.all().filter(
+                amount__gte=request.min_visible_amount, 
+                amount__lte=request.max_visible_amount
+            ).order_by('-id')
+
+            if approvals:
+                serializer = WithdrawalApprovalSerializer(approvals, many=True)
+                response["result"] = serializer.data
+            else:
+                response["result"] = []
+            return Response(response, status=response.get('httpstatus'))
+        except Exception as e:
+            response['status'] = 'error'
+            response['errorcode'] = status.HTTP_400_BAD_REQUEST
+            response['reason'] = str(e)
+            response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+            return Response(response, status=response.get('httpstatus'))
+
+
+    def post(self, request):
+        try:
+            response = {"status": "success", "errorcode": "", "reason": "", "result":"", "httpstatus": status.HTTP_200_OK}
+            __data = request.data.get('data')
+            user_id = request.session_user
+
+            __data["userId"] = user_id
+
+            if __data:
+
+                crmRes = crm_api.initial_withdrawal(__data)
+                print("crmRes", crmRes)
+                if not crmRes.get("success"):
+                    response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                    response['httpstatus'] = response['errorcode']
+                    response['reason'] = str(crmRes["result"])
+                else :
+                    response['result'] = "Withdrawal request hase been sent to admin...!!"
+
+                __data["transectionID"] = crmRes.get("result").get("id")
+                serializer = WithdrawalApprovalSerializer(data=__data)
+                if serializer.is_valid():
+                    serializer.save()
+                    
+                else:
+                    response['status'] = 'error'
+                    response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                    response['reason'] = str(serializer.errors)
+                    response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+            return Response(response, status=response.get('httpstatus'))
+        except Exception as e:
+            response['status'] = 'error'
+            response['errorcode'] = status.HTTP_400_BAD_REQUEST
+            response['reason'] = str(e)
+            response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+            return Response(response, status=response.get('httpstatus'))
+    
+    @check_user_permissions
+    def patch(self, request, pk=None):
+        try:
+            response = {"status": "success", "errorcode": "", "reason": "", "result":"", "httpstatus": status.HTTP_200_OK}
+            __data = request.data.get('data')
+            if __data:
+                response_message = {}
+                serializer = WithdrawalApprovalActionSerializer(data=request.data)
+                serializer.is_valid(raise_exception=True)
+
+                event = serializer.validated_data["event"]
+                data = serializer.validated_data["data"]
+
+                action = data.get("action")        # ✅ true/false
+                note = data.get("note", "")
+
+                user_id = request.session_user
+
+                try:
+                    approval = WithdrawalApprovals.objects.get(pk=pk)
+                except WithdrawalApprovals.DoesNotExist:
+                    return Response({"status": "error", "reason": "Invalid ID"}, status=404)
+                
+                if not (request.min_visible_amount <= approval.amount <= request.max_visible_amount):
+                    response['status'] = 'error'
+                    response['errorcode'] = 403
+                    response['reason'] = "You dont have permission to modify this transection!!!"
+                    response['httpstatus'] = 403
+                    return Response(response, status=response['httpstatus'])
+
+                # ✅ Stage 1 (auto-detected)
+                if approval.first_approval_by is None:
+                    approval.first_approval_by = user_id
+                    approval.first_approval_action = action
+                    approval.first_approval_note = note
+                    approval.first_approval_at = timezone.now()
+                    approval.save()
+
+                    response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                    if action:
+                        response['reason'] = str("Transaction approved.")
+                    else:
+                        response['reason'] = str("Transaction declined.")
+                        response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                    return Response(response, status=response.get("httpstatus"))
+
+
+                # -------------------------------
+                # ✅ SECOND APPROVAL
+                # -------------------------------
+                # ✅ Stage 2 (auto-detected)
+                if approval.first_approval_by and  approval.first_approval_by == user_id:
+                    response['status'] = 'error'
+                    response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                    response['reason'] = str("You have already approved this transaction.")
+                    response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                    return Response(response, status=400)
+                    
+                if approval.second_approval_by is None:
+                    approval.second_approval_by = user_id
+                    approval.second_approval_action = action
+                    approval.second_approval_note = note
+                    approval.second_approval_at = timezone.now()
+                    approval.save()
+
+                    # ✅ If second stage NOT approved → STOP here
+                    if not action:
+                        response['status'] = 'error'
+                        response['errorcode'] = status.HTTP_200_OK
+                        response['reason'] = str("Transaction declined.")
+                        response['httpstatus'] = status.HTTP_200_OK
+                        return Response(response, status=200)
+
+                    if action:
+                        try:
+                            psp = PSPRouter.get_psp(approval.pspName)
+                        except Exception as e:
+                            response['status'] = 'error'
+                            response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                            response['reason'] = str(e)
+                            response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                            return Response(response, status=400)
+                        try:
+                            psp_response = psp.payout(approval)
+                            print("PSP Response:", psp_response)
+                            if isinstance(psp_response, dict) and psp_response.get("success") is True:
+                                response_message["psp_payout"] = "Payout Successful!"
+                                print("✅ Payout Successful!")
+                            elif isinstance(psp_response, dict) and psp_response.get("success") is False:
+                                response_message["psp_payout"] = "Payout Failed!"
+                                print("❌ Payout Failed:", psp_response.get("errorMessage"))
+                            elif hasattr(psp_response, "status_code"):
+                                if psp_response.status_code != 200:
+                                    response_message["psp_payout"] = "Payout Failed!"
+                                    print("❌ HTTP Error:", psp_response.status_code)
+                                body = psp_response.json()
+                                if body.get("success") is False:
+                                    response_message["psp_payout"] = "Payout Failed!"
+
+                                response_message["psp_payout"] = "Payout Successful!"
+                            else:
+                                # 4. Unexpected format
+                                print("❌ Unexpected PSP response format:", psp_response)
+                                response_message["psp_payout"] = "Unexpected response format"
+
+                        except Exception as e:
+                            print("❌ EXCEPTION during payout:", str(e))
+                            return {
+                                "status": "exception",
+                                "error": str(e)
+                            }
+
+                        crmRes = crm_api.verify_withdrawal(approval.transectionID)
+                        # print("crmRes", crmRes)
+                        if not crmRes.get("success"):
+                            response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                            response['httpstatus'] = response['errorcode']
+                            response['reason'] = str(crmRes["result"])
+                        else :
+                            response_message['crm_api'] = "Withdrawal request hase been Successfully Completed On CRM!!"
+                        response_message["api_response"] = f"Withdrawal {pk} approved in stage 2 ✅ (FINAL)"
+                        response["result"] = response_message
+                    else:
+                        response["result"] = f"Withdrawal {pk} declined in stage 2 ❌"
+
+                    return Response(response, status=200)
+            return Response(response, status=response.get('httpstatus'))
+        except WithdrawalApprovals.DoesNotExist:
+            response['status'] = 'error'
+            response['errorcode'] = status.HTTP_400_BAD_REQUEST
+            response['reason'] = str("Withdrawal request not found")
+            response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+            return Response(response, status=response.get('httpstatus'))
+        except Exception as e:
+            response['status'] = 'error'
+            response['errorcode'] = status.HTTP_400_BAD_REQUEST
+            response['reason'] = str(e)
+            response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+            return Response(response, status=response.get('httpstatus'))
 
 
 class Match2PayPayInWebHook(APIView):
@@ -154,6 +491,40 @@ class Match2PayPayInWebHook(APIView):
 
         elif status == "DONE":
             print(f"Transaction {txid} confirmed. Final amount: {final_amount} {final_currency}")
+            record = OrderDetails.objects.get(transactionId=payment_id)
+            if record:
+                status_update = {
+                    "status": "SUCCESS"
+                }
+                serializer = OrderDetailsSerializer(record, data=status_update, partial=True)
+                if serializer.is_valid():
+                    try:
+                        serializer.save()
+                        print("Record updated successfully")
+                    except Exception as save_exception:
+                        print(f"Error saving record: {save_exception}")
+                else:
+                    print(f"Serializer validation errors: {serializer.errors}")
+                payload = {
+                    "brokerBankingId": record.brokerBankingId,
+                    "method" : "Crypto",
+                    "comment": "Deposit for Trading Account Approved",
+                    "pspTransactionId" : str(payment_id),
+                    "decisionTime" : int(datetime.now().timestamp() * 1000)
+                }
+                print(payload, "==================== 01")
+                header = {
+                    "Content-Type": "application/json",
+                    "x-crm-api-token": str(CRM_AUTH_TOKEN)
+                }
+
+                crmRes = requests.post(str(CRM_MANUAL_DEPOSIT_APPROVE_URL), json=payload, headers=header).json()
+                print(crmRes)
+                if crmRes.get('success'):
+                    print("order suucess on aintilope============== ")
+            else:
+                print("No record found with the provided payment_id: ", payment_id)
+                    
             # mark deposit as confirmed
 
         else:

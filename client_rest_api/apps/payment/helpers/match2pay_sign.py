@@ -1,4 +1,3 @@
-import json
 import hashlib
 
 def format_nested_dict(d, ordered_keys):
@@ -13,16 +12,6 @@ def format_nested_dict(d, ordered_keys):
 
 def format_customer(d):
     """Formats the customer dictionary"""
-    ordered_keys = [
-        "firstName",
-        "lastName",
-        "address",
-        "contactInformation",
-        "locale",
-        "dateOfBirth",
-        "tradingAccountLogin",
-        "tradingAccountUuid",
-    ]
     address_keys = ["address", "city", "country", "zipCode", "state"]
     contact_keys = ["email", "phoneNumber"]
     return (
@@ -43,11 +32,23 @@ def format_customer(d):
     )
 
 def concatenate_values(d):
-    """Concatenates values from the dictionary."""
+    """
+    Concatenates values in the correct order.
+    Handles both DEPOSIT and WITHDRAWAL requests automatically.
+    """
+    # common fields (order-sensitive)
     ordered_keys = [
         "amount",
         "apiToken",
         "callbackUrl",
+    ]
+
+    # withdrawal includes cryptoAddress
+    if "cryptoAddress" in d:
+        ordered_keys.append("cryptoAddress")
+
+    # then rest of common fields
+    ordered_keys += [
         "currency",
         "customer",
         "failureUrl",
@@ -57,56 +58,27 @@ def concatenate_values(d):
         "successUrl",
         "timestamp",
     ]
-    concatenated_string = "".join(
-        format_customer(d[k])
-        if k == "customer"
-        else f"{d[k]:f}".rstrip('0').rstrip('.') if k == "amount"
-        else str(d[k])
-        for k in ordered_keys
-    )
+
+    # concatenate values in correct order
+    concatenated_string = ""
+    for k in ordered_keys:
+        if k not in d:
+            continue
+        if k == "customer":
+            concatenated_string += format_customer(d[k])
+        elif k == "amount":
+            concatenated_string += f"{float(d[k]):.6f}".rstrip("0").rstrip(".")
+        else:
+            concatenated_string += str(d[k])
+
     return concatenated_string
 
 def generate_signature(request_body, api_secret):
-    """Generates SHA-384 signature based on sorted keys and formatted concatenated values."""
-    formatted_string = concatenate_values(request_body)
-    formatted_string += api_secret
-    print(formatted_string)
+    print("========================================================= 01")
+    print(request_body)
+    """Generates SHA-384 signature for deposit or withdrawal"""
+    formatted_string = concatenate_values(request_body) + api_secret
+    print(formatted_string)  # optional debug
     signature = hashlib.sha384(formatted_string.encode("utf-8")).hexdigest()
+    print("Generated Signature:", signature)
     return signature
-
-request_body = {
-    "amount": 10,
-    "apiToken": "Bg6AcUwDopx2-9tsKeri99CtupYQs8CQFnQea4oceOdQlFYEkpyIq209",
-    "callbackUrl": "http://test/deposit/callback",
-    "currency": "USD",
-    "customer": {
-        "firstName": "firstName_4da0af01617c",
-        "lastName": "lastName_801eb285edd1",
-        "address": {
-            "address": "address_52c10ed842fb",
-            "city": "city_62da6faaeb17",
-            "country": "country_a6be7ed127cc",
-            "zipCode": "zipCode_3e168862ef49",
-            "state": "state_b8d531055c90",
-        },
-        "contactInformation": {
-            "email": "email_e4ac63093536",
-            "phoneNumber": "phoneNumber_8fcb0237f7ee",
-        },
-        "locale": "en_US",
-        "dateOfBirth": "dateOfBirth_338c08d95dd6",
-        "tradingAccountLogin": "clientId_d6811bff2963",
-        "tradingAccountUuid": "clientUid_56b798ba2ae2",
-    },
-    "failureUrl": "http://test/failed-payment",
-    "paymentCurrency": "USX",
-    "paymentGatewayName": "USDT TRC20",
-    "paymentMethod": "CRYPTO_AGENT",
-    "successUrl": "http://test/thanku",
-    "timestamp": "1764149779000"
-}
-
-api_secret = "ApiSecretProvidedBySupport"
-
-signature = generate_signature(request_body, api_secret)
-print("Generated Signature:", signature)
