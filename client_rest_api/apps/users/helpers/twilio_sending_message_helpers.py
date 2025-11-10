@@ -20,7 +20,7 @@ def send_text_message(phoneNo):
      
         message = client.messages.create(
             body = f"verify OTP!!! {otp}",
-            from_ = "+12175831441",
+            from_ = "+18203007188",
             to = formatNo
         )
 

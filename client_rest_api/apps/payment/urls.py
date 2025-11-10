@@ -9,6 +9,7 @@ urlpatterns = [
    
    path('match2pay-pay-in/', views.Match2PayPayIn.as_view(), name="match2pay-pay-in"),
    path('match2pay-pay-in-webhook/', views.Match2PayPayInWebHook.as_view(), name="match2pay-pay-in-webhook"),
+   path('match2pay-pay-out-webhook/', views.Match2PayPayOutWebHook.as_view(), name="match2pay-pay-out-webhook"),
 
 
    path('withdrawal-request/', views.WithdrawalRequest.as_view(), name="withdrawal-request"),
