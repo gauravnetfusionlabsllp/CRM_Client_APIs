@@ -91,11 +91,25 @@ class Match2PayPSP:
                 headers=headers,
                 data=json.dumps(request_body)
             )
+            data = response.json()
+            payment_id = data.get("paymentId") 
+            if payment_id:
+                # ✅ get the related order
+                order = __data.ordertransactionid  
+                if order:
+                    order.transactionId = payment_id
+                    order.save()
+                    print("✅ Saved paymentId to OrderDetails:", payment_id)
+                else:
+                    print("⚠ No related order found for this withdrawal.")
+            else:
+                print("⚠ PSP response missing paymentId:", data)
+
 
             # ✅ Print response
             print(response.status_code)
             print(response.text)
-            return response
+            return data
         except Exception as e:
             print(str(e))
 

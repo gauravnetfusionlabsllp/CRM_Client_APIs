@@ -21,7 +21,7 @@ class CheezePayPSP:
             response = {"status": "success", "errorcode": "", "reason": "", "result": "", "httpstatus": status.HTTP_200_OK}
 
             data = approval
-            amount = float(amountWithFees)
+            amount = amountWithFees
 
             query =f"""
                 SELECT
