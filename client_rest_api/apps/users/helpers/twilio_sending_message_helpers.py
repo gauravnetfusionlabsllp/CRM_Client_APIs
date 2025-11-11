@@ -17,20 +17,47 @@ def send_text_message(phoneNo):
         cache.set(f"otp_{phoneNo}", otp, timeout=300)
 
         client = Client(account_sid, auth_token)
-     
-        message = client.messages.create(
-            body = f"verify OTP!!! {otp}",
-            from_ = "+18203007188",
-            to = formatNo
+
+        verify = client.verify.v2.services("VAff903484b83a2edd030385728bb3d467").verifications.create(
+            to=formatNo,
+            channel="sms"
         )
 
-        print(message, "--------------------150")
+        # message = client.messages.create(
+        #     body = f"verify OTP!!! {otp}",
+        #     from_ = "+18203007188",
+        #     to = formatNo
+        # )
 
-        if not message:
+        # print(message, "--------------------150")
+
+        if not verify:
             return False
 
         return True
     
     except Exception as e:
         print(f"Error in Sending message from the Twilio: {str(e)}")
+        return False
+    
+
+def verify_otp(phoneNo, otp):
+    try:
+        formatNo = str("+"+phoneNo).replace(" ","")
+        client = Client(account_sid, auth_token)
+        
+
+        check = client.verify.v2.services("VAff903484b83a2edd030385728bb3d467").verification_checks.create(
+            to=formatNo, 
+            code=int(otp)
+        )
+
+        print(check.status,"----------------------")
+        if not check:
+            return False
+        
+        return True
+    
+    except Exception as e:
+        print(f"Error in Verifing OTP from the Twilio: {str(e)}")
         return False

@@ -17,7 +17,7 @@ import requests
 from dotenv import load_dotenv
 import json
 
-from apps.users.helpers.twilio_sending_message_helpers import send_text_message
+from apps.users.helpers.twilio_sending_message_helpers import send_text_message, verify_otp
 
 # Create your views here.
 
@@ -70,13 +70,9 @@ class VerifyUserPhoneNumber(APIView):
             phoneNo = data.get('phoneNo')
             otp = data.get('otp')
             
-
-            saved_otp = cache.get(f"otp_{phoneNo}")
-            if saved_otp == otp:
-                response['result'] = {
-                    "msg": "OTP verified successfully"
-                }
-
+            res = verify_otp(phoneNo, otp)
+            if res:
+                response['reason'] = "OTP Verified Successfully!!!!"
                 return Response(response, status=response.get('httpstatus'))
 
             response['status'] = 'error'

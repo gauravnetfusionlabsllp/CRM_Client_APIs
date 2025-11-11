@@ -924,7 +924,7 @@ class CheezeePayUPIPayIN(APIView):
             params = (str(authToken),)
             cursor.execute(query, params)
             userData = cursor.fetchone()
-
+           
             if not userData:
                 response['status'] = 'error'
                 response['errorcode'] = status.HTTP_401_UNAUTHORIZED
