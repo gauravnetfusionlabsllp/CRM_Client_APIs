@@ -30,6 +30,7 @@ class CRM:
         # ✅ Only use usdAmount if present
         usdAmount = data.get("usdAmount")
         usdAmount = float(usdAmount) if usdAmount is not None else 0.0
+        print(usdAmount,"-------------------150")
 
         # ✅ Safe amount
         amount = data.get("amount")
