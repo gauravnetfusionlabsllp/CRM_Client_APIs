@@ -226,6 +226,7 @@ class Match2PayPayIn(APIView):
                             crmRes = requests.post(str(CRM_MANUAL_DEPOSIT_URL), json=crm_payload, headers=header).json()
                             if crmRes['result']['success']:
                                 payload['brokerBankingId'] = str(crmRes['result']['result']['id'])
+                                payload['order_type'] = str("deposit")
                                 print(payload)
                                 serializer = OrderDetailsSerializer(data = payload)
                                 if serializer.is_valid():
@@ -295,6 +296,8 @@ class WithdrawalRequest(APIView):
                     response['errorcode'] = status.HTTP_400_BAD_REQUEST
                     response['httpstatus'] = response['errorcode']
                     response['reason'] = str(crmRes["result"])
+                    response['status'] = "error"
+                    return Response(response, status=response.get('httpstatus'))
                 else :
                     order_payload = {
                         "userId" :  user_id,
@@ -471,10 +474,11 @@ class WithdrawalRequest(APIView):
 
                         except Exception as e:
                             print("❌ EXCEPTION during payout:", str(e))
-                            return {
-                                "status": "exception",
-                                "error": str(e)
-                            }
+                            response['status'] = 'error'
+                            response["errorcode"] = status.HTTP_400_BAD_REQUEST
+                            response['reason'] = f"Error During Payout: {str(e)}"
+                            response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                            return Response(response, status=response.get('httpstatus'))
 
                         # # crmRes = crm_api.verify_withdrawal(approval.brokerBankingId)
                         # # print("crmRes", crmRes)
@@ -571,7 +575,12 @@ class Match2PayPayOutWebHook(APIView):
                 "decisionTime": int(time.time())
             }
             print(order.brokerBankingId)
-            crmRes = crm_api.verify_withdrawal(int(order.brokerBankingId))
+            crmRes = crm_api.verify_withdrawal(
+                int(order.brokerBankingId),
+                method=8,
+                transactionId=str(payment_id),
+                pspId=13
+            )
             print("crmRes: ", crmRes)
             if not crmRes.get("success"):
                 print("ERROR in verify_withdrawal Match2PayPayOutWebHook")

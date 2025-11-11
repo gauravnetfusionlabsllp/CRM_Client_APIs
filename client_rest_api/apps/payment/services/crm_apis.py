@@ -10,6 +10,7 @@ CRM_AUTH_TOKEN = os.environ.get('CRM_AUTH_TOKEN')
 CRM_MANUAL_WITHDRAWAL_URL = os.environ.get('CRM_MANUAL_WITHDRAWAL_URL')
 CRM_MANUAL_WITHDRAWAL_APPROVE_URL = os.environ.get("CRM_MANUAL_WITHDRAWAL_APPROVE_URL")
 CRM_MANUAL_WITHDRAWAL_CANCEL_URL = os.environ.get("CRM_MANUAL_WITHDRAWAL_CANCEL_URL")
+CRM_GET_TRANSACTIONS_URL = os.environ.get("CRM_GET_TRANSACTIONS_URL")
 
 headers = {
     "Content-Type": "application/json",
@@ -89,12 +90,12 @@ class CRM:
             print(f"Exception occurred: {e}")
             return {'success': False }
     
-    def verify_withdrawal(self, withdrawalID, method, transactioId, pspId):
+    def verify_withdrawal(self, withdrawalID, method, transactionId, pspId):
         payload = {
             "brokerBankingId": withdrawalID,
             "method": method,
             "comment": "Testing",
-            "pspTransactionId": transactioId,
+            "pspTransactionId": transactionId,
             "pspId": pspId,
             "decisionTime": int(datetime.now().timestamp() * 1000)
         }
@@ -122,6 +123,25 @@ class CRM:
             response = requests.post(str(CRM_MANUAL_WITHDRAWAL_CANCEL_URL), json=payload ,headers=headers)
             if response.status_code == 200:
                 print("Withdrawal request sent successfully!")
+                return response.json()
+            else:
+                print(f"Error: {response.status_code}")
+                print(response.text)
+                return {'success': False }
+        except Exception as e:
+            print(f"Exception occurred: {e}")
+            return {'success': False }
+    
+    def get_transactions(self, payload):
+        try:
+            print(str(CRM_GET_TRANSACTIONS_URL))
+            print(payload)
+            headers['x-auth-token'] = 'c1a35cc7c389c9057f1ea6d5272155536cec413a193d54cb1e03de64ae553112'
+            print(headers)
+            response = requests.post(str(CRM_GET_TRANSACTIONS_URL), json=payload ,headers=headers)
+            print(response)
+            if response.status_code == 200:
+                print(response.json())
                 return response.json()
             else:
                 print(f"Error: {response.status_code}")

@@ -12,6 +12,7 @@ auth_token = os.environ['TWILIO_AUTH_TOKEN']
 def send_text_message(phoneNo):
     try:
         formatNo = str("+"+phoneNo).replace(" ","")
+        print("======================== formatNo: ", formatNo)
 
         otp = str(random.randint(100000, 999999))
         cache.set(f"otp_{phoneNo}", otp, timeout=300)
