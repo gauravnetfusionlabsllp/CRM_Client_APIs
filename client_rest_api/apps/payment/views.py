@@ -344,7 +344,7 @@ class WithdrawalRequest(APIView):
             response = {"status": "success", "errorcode": "", "reason": "", "result":"", "httpstatus": status.HTTP_200_OK}
             __data = request.data.get('data')
             amountWithFees = __data.get('amountWithFees')
-            usdAmount = __data.get('usdAmount')
+            # usdAmount = __data.get('usdAmount')
             if __data:
                 response_message = {}
                 serializer = WithdrawalApprovalActionSerializer(data=request.data)
@@ -986,15 +986,13 @@ class CheezeePayUPIPayIN(APIView):
                     "pspId": 11,
                     "pspTransactionId": payload.get('mchOrderNo'),
                     "status": "Pending",
-                    "normalizedAmount": int(amount),
+                    "normalizedAmount": int(usdAmount * 100),
                     "decisionTime": 0,
                     "declineReason": "Cheezee Pay",
                     "brandExternalId": payload.get('mchOrderNo')
                 }
 
                 crmRes = requests.post("https://apicrm.sgfx.com/SignalsCRM//crm-api/brokers/bankings/deposit/manual", json=payload, headers=header).json()
-
-                print(crmRes, "------------------crm")
 
                 if crmRes['result']['success']:
                     ordRec.brokerBankingId = str(crmRes['result']['result']['id'])
@@ -1054,7 +1052,6 @@ class CheezeePayInCallBackWebhook(APIView):
             
             orderId = str(uuid.UUID(mchOrderNo))
             orderData = OrderDetails.objects.get(orderId = orderId)
-            print(orderData, "----------------------Order")
 
             if orderData.status == "SUCCESS":
                 return Response({"code": "200", "msg": "Already processed"}, status=status.HTTP_200_OK)
@@ -1144,7 +1141,7 @@ class CheezeePayOutWebhook(APIView):
                 transactionId=str(mchOrderNo),
                 pspId=11
             )
-            
+            print(crmRes,"------------------150")
             if crmRes.get('success'):
                 orderData.transactionId = str(platOrderNo)
                 orderData.status = "SUCCESS"
