@@ -44,7 +44,7 @@ from .services.crm_apis import CRM
 
 
 from apps.payment.constant.change_user_category_constant import check_and_update_user_category
-
+from apps.payment.services.psp_mat2pay_methods import payment_getway
 
 # ---------------Jena Pay--------------------------
 
@@ -94,6 +94,7 @@ class Match2PayPayIn(APIView):
         response = {"status": "success", "errorcode": "", "reason": "", "result":"", "httpstatus": status.HTTP_200_OK}
         try:
             request_body = request.data.get('data')
+            print("request_body: ", request_body)
             amount = request_body.get('amount')
             authToken = request.headers.get('Auth-Token')
             # authToken = request_body.get('Auth-Token')
@@ -156,7 +157,7 @@ class Match2PayPayIn(APIView):
                                 "phoneNumber":data.get('telephone') if data.get('telephone') else 'default'
                             },
                             "locale":data.get('country_iso') if data.get('country_iso') else 'default',
-                            "dateOfBirth": "dateOfBirth_338c08d95dd6",
+                            "dateOfBirth": "04-05-2001",
                             "tradingAccountLogin": trading_info_data.get('external_id') if data.get('external_id') else 'default',
                             "tradingAccountUuid": data.get('id') if data.get('id') else 'default'
 
@@ -172,11 +173,11 @@ class Match2PayPayIn(APIView):
                 serialized_data = serializer.validated_data
                 serialized_data['apiToken'] = MATCH2PAY_PAY_API_TOKEN
                 serialized_data['callbackUrl'] = MATCH2PAY_CALLBACK_URL
-                serialized_data['currency'] = 'USD'
+                serialized_data['currency'] = str(payment_getway[request_body.get('paymentGateway')].get('currency'))
                 serialized_data['failureUrl'] = MATCH2PAY_FAILURE_URL
-                serialized_data['paymentCurrency'] = "USX"
-                serialized_data['paymentGatewayName'] = "USDT TRC20"
-                serialized_data['paymentMethod'] = "CRYPTO_AGENT"
+                serialized_data['paymentCurrency'] = str(payment_getway[request_body.get('paymentGateway')].get('paymentCurrency'))
+                serialized_data['paymentGatewayName'] = str(request_body.get('paymentGateway'))
+                serialized_data['paymentMethod'] = str(payment_getway[request_body.get('paymentGateway')].get('paymentMethod'))
                 serialized_data['successUrl'] = MATCH2PAY_SUCCESS_URL
                 serialized_data['timestamp'] = '1764149779000'
                 serialized_data["signature"] = generate_signature(serialized_data, MATCH2PAY_API_SECRETE)
@@ -186,7 +187,7 @@ class Match2PayPayIn(APIView):
                     headers=headers,
                     data=json.dumps(serialized_data)
                 )
-                print(response_data)
+                print("response_data========>", response_data.json())
                 if response_data.json().get("status"):
                     try:
                         # data = response_data.json()
@@ -348,6 +349,11 @@ class WithdrawalRequest(APIView):
                 __data["brokerBankingId"] = crmRes.get("result").get("id")
                 if __data.get("pspName") == "cheezepay":
                     __data["amount"] = __data.get("usdAmount")
+                elif __data.get("pspName") == "match2pay":
+                    __data["walletAddress"] = __data.get("bankDetails").get('walletAddress')
+                    
+                    
+
                 serializer = WithdrawalApprovalSerializer(data=__data)
                 if serializer.is_valid():
                     serializer.save()

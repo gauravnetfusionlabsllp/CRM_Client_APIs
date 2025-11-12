@@ -15,6 +15,7 @@ MATCH2PAY_SUCCESS_URL = os.environ.get('MATCH2PAY_SUCCESS_URL')
 CRM_MANUAL_DEPOSIT_URL = os.environ.get('CRM_MANUAL_DEPOSIT_URL')
 CRM_MANUAL_DEPOSIT_APPROVE_URL = os.environ.get('CRM_MANUAL_DEPOSIT_APPROVE_URL')
 CRM_AUTH_TOKEN = os.environ.get('CRM_AUTH_TOKEN')
+from apps.payment.services.psp_mat2pay_methods import payment_getway
 
 class Match2PayPSP:
     BASE_URL = "url"
@@ -28,6 +29,7 @@ class Match2PayPSP:
             print(__data.amount)
             print(__data.userId)
             print(__data.email)
+            print(__data.paymentMethod)
             query =f"""
                 SELECT
                 u.id, 
@@ -50,7 +52,7 @@ class Match2PayPSP:
                 "amount": int(__data.amount),
                 "apiToken": MATCH2PAY_PAY_API_TOKEN,
                 "callbackUrl": MATCH2PAY_PAYOUT_CALLBACK_URL,
-                "currency": "USD",
+                "currency": str(payment_getway[__data.paymentMethod].get('currency')),
                 "cryptoAddress": str(__data.walletAddress),  # 🔹 Replace with actual USDT TRC20 wallet address
                 "customer": {
                     "firstName":str(__user_data.get('first_name')) if __user_data.get('first_name') else 'default',
@@ -72,9 +74,9 @@ class Match2PayPSP:
                     "tradingAccountUuid": "clientUid_67890"
                 },
                 "failureUrl": MATCH2PAY_FAILURE_URL,
-                "paymentCurrency": "USX",
-                "paymentGatewayName": "USDT TRC20",
-                "paymentMethod": "CRYPTO_AGENT",
+                "paymentCurrency": str(payment_getway[__data.paymentMethod].get('paymentCurrency')),
+                "paymentGatewayName": str(__data.paymentMethod),
+                "paymentMethod": str(payment_getway[__data.paymentMethod].get('paymentMethod')),
                 "successUrl": MATCH2PAY_SUCCESS_URL,
                 "timestamp": "1764149779000"
             }

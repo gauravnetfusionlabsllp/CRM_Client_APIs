@@ -33,6 +33,7 @@ class WithdrawalApprovals(TimeStampModel):
     walletAddress = models.CharField(max_length=150, null=True, blank=True)
     currency = models.CharField(max_length=250, unique=False, blank=True, null=True)
     pspName = models.CharField(max_length=250, unique=False, blank=True, null=True)
+    paymentMethod = models.CharField(max_length=250, unique=False, blank=True, null=True)
     first_approval_by = models.IntegerField(null=True,blank=True,help_text="User ID who performed the first approval.")
     first_approval_action = models.BooleanField(default=False,help_text="Whether the first approval was accepted (True) or rejected (False).")
     first_approval_at = models.DateTimeField(null=True,blank=True,help_text="Timestamp of first approval.")
