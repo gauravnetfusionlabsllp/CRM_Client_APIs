@@ -703,7 +703,7 @@ class Match2PayPayInWebHook(APIView):
 
 # ----------------------------Jena PAY-------------------------------------------
 class JenaPayPayIn(APIView):
-    @check_and_update_user_category
+    # @check_and_update_user_category 
     def post(self, request):
         try:
             response = {"status": "success", "errorcode": "", "reason": "", "result":"", "httpstatus": status.HTTP_200_OK}
@@ -721,22 +721,14 @@ class JenaPayPayIn(APIView):
                 response['httpstatus'] = status.HTTP_400_BAD_REQUEST
                 return Response(response, status=response.get('httpstatus'))
 
+            user_id = request.session_user
             cursor = connection.cursor(dictionary=True)
 
             query = """
-                SELECT 
-                    u.full_name, 
-                    u.email, 
-                    u.id AS user_id
-                FROM crmdb.auth_tokens AS t
-                JOIN crmdb.users AS u 
-                    ON u.id = t.user_id
-                WHERE 
-                    t.auth_token = %s
-                    AND t.user_id IS NOT NULL
+                SELECT u.full_name, u.email, u.telephone, u.id FROM crmdb.users AS u where u.id = %s
             """
 
-            params = (str(authToken),)
+            params = (str(user_id),)
             cursor.execute(query, params)
             userData = cursor.fetchone()
 
@@ -811,7 +803,7 @@ class JenaPayPayIn(APIView):
 
             header = {
                 "Content-Type": "application/json",
-                "x-crm-api-token": "c6420f81-d146-44c1-807c-2462f9210361"
+                "x-crm-api-token": str(CRM_AUTH_TOKEN)
             }
 
             payload = {
@@ -829,7 +821,7 @@ class JenaPayPayIn(APIView):
                 "brandExternalId": order.get('number')
             }
 
-            crmRes = requests.post("https://apicrm.sgfx.com/SignalsCRM//crm-api/brokers/bankings/deposit/manual", json=payload, headers=header).json()
+            crmRes = requests.post(str(CRM_MANUAL_DEPOSIT_URL), json=payload, headers=header).json()
 
             if crmRes['result']['success']:
                 ordRec.brokerBankingId = str(crmRes['result']['result']['id'])
@@ -891,10 +883,10 @@ class JenaPayPayInCallBack(APIView):
 
             header = {
                 "Content-Type": "application/json",
-                "x-crm-api-token": "c6420f81-d146-44c1-807c-2462f9210361"
+                "x-crm-api-token": str(CRM_AUTH_TOKEN)
             }
 
-            crmRes = requests.post("https://apicrm.sgfx.com/SignalsCRM//crm-api/brokers/bankings/deposit/approve", json=payload, headers=header).json()
+            crmRes = requests.post(str(CRM_MANUAL_DEPOSIT_APPROVE_URL), json=payload, headers=header).json()
 
             print(crmRes,"--------------------")
 
@@ -997,7 +989,7 @@ class CheezeePayUPIPayIN(APIView):
                 
                 header = {
                     "Content-Type": "application/json",
-                    "x-crm-api-token": "c6420f81-d146-44c1-807c-2462f9210361"
+                    "x-crm-api-token": str(CRM_AUTH_TOKEN)
                 }
 
                 payload = {
@@ -1015,7 +1007,7 @@ class CheezeePayUPIPayIN(APIView):
                     "brandExternalId": payload.get('mchOrderNo')
                 }
 
-                crmRes = requests.post("https://apicrm.sgfx.com/SignalsCRM//crm-api/brokers/bankings/deposit/manual", json=payload, headers=header).json()
+                crmRes = requests.post(str(CRM_MANUAL_DEPOSIT_URL), json=payload, headers=header).json()
 
                 if crmRes['result']['success']:
                     ordRec.brokerBankingId = str(crmRes['result']['result']['id'])
@@ -1090,10 +1082,10 @@ class CheezeePayInCallBackWebhook(APIView):
 
             header = {
                 "Content-Type": "application/json",
-                "x-crm-api-token": "c6420f81-d146-44c1-807c-2462f9210361"
+                "x-crm-api-token": str(CRM_AUTH_TOKEN)
             }
                 
-            crmRes = requests.post("https://apicrm.sgfx.com/SignalsCRM//crm-api/brokers/bankings/deposit/approve", json=payload, headers=header).json()
+            crmRes = requests.post(str(CRM_MANUAL_DEPOSIT_APPROVE_URL), json=payload, headers=header).json()
 
             # os.makedirs("crm_logs", exist_ok=True)
             # filename = f"crm_logs/crm_response_{orderData.orderId}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
