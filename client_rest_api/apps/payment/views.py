@@ -262,25 +262,47 @@ class WithdrawalRequest(APIView):
     def get(self, request):
         print("request.min_visible_amount", request.min_visible_amount)
         print("request.max_visible_amount", request.max_visible_amount)
+        
+        response = {"status": "success", "errorcode": "", "reason": "", "result": "", "httpstatus": status.HTTP_200_OK}
         try:
-            response = {"status": "success", "errorcode": "", "reason": "", "result":"", "httpstatus": status.HTTP_200_OK}
-            approvals = WithdrawalApprovals.objects.all().filter(
-                amount__gte=request.min_visible_amount, 
+            # ✅ Get pagination params
+            limit = int(request.query_params.get('limit', 10))
+            offset = int(request.query_params.get('start', 0))
+
+            # ✅ Filter queryset
+            approvals_qs = WithdrawalApprovals.objects.filter(
+                amount__gte=request.min_visible_amount,
                 amount__lte=request.max_visible_amount
             ).order_by('-id')
 
-            if approvals:
-                serializer = WithdrawalApprovalSerializer(approvals, many=True)
-                response["result"] = serializer.data
-            else:
-                response["result"] = []
+            # ✅ Get total count before pagination
+            total_records = approvals_qs.count()
+
+            # ✅ Apply pagination
+            paginated_approvals = approvals_qs[offset:offset + limit]
+
+            # ✅ Serialize data
+            serializer = WithdrawalApprovalSerializer(paginated_approvals, many=True)
+
+            # ✅ Add results and pagination info
+            response["result"] = {
+                "records": serializer.data,
+                "totalRecords": total_records,
+                "limit": limit,
+                "offset": offset
+            }
+
             return Response(response, status=response.get('httpstatus'))
+
         except Exception as e:
-            response['status'] = 'error'
-            response['errorcode'] = status.HTTP_400_BAD_REQUEST
-            response['reason'] = str(e)
-            response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+            print("Error in WithdrawalApprovals GET:", str(e))
+            response["status"] = "error"
+            response["errorcode"] = status.HTTP_400_BAD_REQUEST
+            response["reason"] = str(e)
+            response["result"] = []
+            response["httpstatus"] = status.HTTP_400_BAD_REQUEST
             return Response(response, status=response.get('httpstatus'))
+
 
 
     def post(self, request):
