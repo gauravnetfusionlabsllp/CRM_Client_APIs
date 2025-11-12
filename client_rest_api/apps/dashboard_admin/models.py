@@ -43,6 +43,7 @@ class WithdrawalApprovals(TimeStampModel):
     second_approval_note = models.CharField(null=True,blank=True,help_text="Message of second approval.")
     brokerBankingId = models.CharField(max_length=150, null=False, blank=False)
     ordertransactionid = models.ForeignKey(OrderDetails, null=True, blank=True, on_delete=models.CASCADE)
+    bankDetails = models.JSONField(default=dict, blank=True, null=True)
 
     def __str__(self):
         return str(self.userId)
