@@ -288,6 +288,7 @@ class WithdrawalRequest(APIView):
             response = {"status": "success", "errorcode": "", "reason": "", "result":"", "httpstatus": status.HTTP_200_OK}
             __data = request.data.get('data')
             user_id = request.session_user
+            # user_id = __data.get('user_id')
             __data["userId"] = user_id
             if __data:
                 crmRes = crm_api.initial_withdrawal(__data)
@@ -913,24 +914,15 @@ class CheezeePayUPIPayIN(APIView):
                 response['reason'] = "Amount, Broker, and brokerUserId are required fileds!!!"
                 response['httpstatus'] = status.HTTP_400_BAD_REQUEST
                 return Response(response, status=response.get('httpstatus'))
-
+            
+            user_id = request.session_user
             cursor = connection.cursor(dictionary=True)
 
             query = """
-                SELECT 
-                    u.full_name, 
-                    u.email,
-                    u.telephone,
-                    u.id AS user_id
-                FROM crmdb.auth_tokens AS t
-                JOIN crmdb.users AS u 
-                    ON u.id = t.user_id
-                WHERE 
-                    t.auth_token = %s
-                    AND t.user_id IS NOT NULL
+                SELECT u.full_name, u.email, u.telephone, u.id FROM crmdb.users AS u where u.id = %s
             """
 
-            params = (str(authToken),)
+            params = (str(user_id),)
             cursor.execute(query, params)
             userData = cursor.fetchone()
            
@@ -942,7 +934,7 @@ class CheezeePayUPIPayIN(APIView):
                 return Response(response, status=response.get('httpstatus'))
             
             ordRec = OrderDetails.objects.create(
-                userId = str(userData.get('user_id')),
+                userId = str(userData.get('id')),
                 full_name = str(userData.get('full_name')),
                 email = str(userData.get('email')),
                 brokerUserId = str(brokerUserId),
@@ -1081,11 +1073,11 @@ class CheezeePayInCallBackWebhook(APIView):
                 
             crmRes = requests.post("https://apicrm.sgfx.com/SignalsCRM//crm-api/brokers/bankings/deposit/approve", json=payload, headers=header).json()
 
-            os.makedirs("crm_logs", exist_ok=True)
-            filename = f"crm_logs/crm_response_{orderData.orderId}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+            # os.makedirs("crm_logs", exist_ok=True)
+            # filename = f"crm_logs/crm_response_{orderData.orderId}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
 
-            with open(filename, "w", encoding="utf-8") as f:
-                json.dump(crmRes, f, indent=4, ensure_ascii=False)
+            # with open(filename, "w", encoding="utf-8") as f:
+            #     json.dump(crmRes, f, indent=4, ensure_ascii=False)
 
             if crmRes.get('success'):
                 orderData.transactionId = str(platOrderNo)
@@ -1150,7 +1142,6 @@ class CheezeePayOutWebhook(APIView):
                 transactionId=str(mchOrderNo),
                 pspId=11
             )
-            print(crmRes,"------------------150")
             if crmRes.get('success'):
                 orderData.transactionId = str(platOrderNo)
                 orderData.status = "SUCCESS"
@@ -1171,88 +1162,55 @@ class CheezeePayOutWebhook(APIView):
             return Response(response, status=response.get('httpstatus'))
 
 
-# class CheezeePayUPIPayOut(APIView):
+class CheezeePayUPIPayOut(APIView):
 
-#     def get(self, request):
-#         try:
-#             response = {"status":"error", "errorcode": "", "reason": "", "result": "", "httpstatus": status.HTTP_200_OK}
-
-#             data = request.data.get('data')
-#             userId =  int(data.get('userId'))
-#             brokerUserId = data.get('brokerUserId')
-#             amount = float(data.get('brokerUserId'))
-#             amountWithFees = float(data.get('amountWithFees'))
-#             usdAmount = data.get('usdAmount')
-
-#             getUserDataQuery = f"SELECT * FROM users where id={userId}"
-#             userData = DBConnection._forFetchingData(getUserDataQuery, using='replica')
-#             userData = userData[0]
-
-#             fee = amountWithFees - amount
-
-#             orderRec = OrderDetails.objects.create(
-#                     userId = str(userData.get('user_id')),
-#                     full_name = str(userData.get('full_name')),
-#                     email = str(userData.get('email')),
-#                     brokerUserId = str(brokerUserId),
-#                     amount = amount,
-#                     pspName = "CheezeePay",
-#                     order_type = "withdrawal"
-#                 )
-
-#             payload = {
-#                 "brokerUserId": brokerUserId,
-#                 "amount": int(usdAmount * 100),
-#                 "fee": fee,
-#                 "withdrawalSubType": 1,
-#                 "comment": "Manual bank withdrawal",
-#                 "commentForUser": "Your withdrawal is being processed",
-#                 "pspId": 12,
-#                 "status": "PendingManualApproval",
-#                 "normalizedAmount": int(data.get("amount")),
-#                 "decisionTime": int(time.time()),
-#                 "caseNumber": "WD-2025-1122",
-#                 "iban": "AE070331234567890123456",
-#                 "bankName": "Emirates NBD",
-#                 "bankSwiftCode": "EBILAEAD",
-#                 "caseOrigin": "Backoffice",
-#                 "withdrawalPurpose": "Personal funds withdrawal",
-#                 "accountHolderName": userData.get("full_name"),
-#                 "bankCountry": "AE",
-#                 "paymentCurrency": "USD",
-#                 "registeredEmail": userData.get("email"),
-#                 "registeredName": userData.get("full_name"),
-#                 "blockedFromManualApproval": False
-#             }
-
-#             header = {
-#                 "Content-Type": "application/json",
-#                 "x-crm-api-token": str(CRM_AUTH_TOKEN)
-#             }
-
+    def post(self, request):
+        try:
+            response = {"status":"error", "errorcode": "", "reason": "", "result": "", "httpstatus": status.HTTP_200_OK}
+            amount = 900
+            account_infos = {
+                "name": "CheezeePayTest",
+                "accountNumber": "10002993920002",
+                "ifscCode": "SBIN0001537",
+                "accountType": "india",
+                "bankName": "visa",
+                "branchName": "branch"
+            }
             
-#             resp = requests.post(CRM_MANUAL_WITHDRAWAL_URL, json=payload, headers=header).json()
-#             if resp.status_code == 200:
-#                 orderRec.save()
+            payload = {
+                "appId": os.environ['CHEEZEE_PAY_APP_ID'],
+                "merchantId": os.environ['CHEEZEE_PAY_MERCHANT_ID'],
+                "mchOrderNo": str("1234456789"),
+                "paymentMethod": "BANK_IN",
+                "amount": str(amount),
+                "name": "testing",
+                # "phone": "+911234567890",
+                "email": "testing@gmail.com",
+                "notifyUrl": os.environ['CHEEZEE_PAYOUT_WEBHOOK'],
+                "payeeAccountInfos": json.dumps([account_infos]),
+                "language": "en",
+                "timestamp": str(int(time.time() * 1000))
+            }
 
-#                 WithdrawalApprovals.objects.create(
-#                     userId = str(userData.get('user_id')),
-#                     brokerUserId = str(brokerUserId),
-#                     email = str(userData.get('email')),
-#                     amount = Decimal(amount)
-#                 )
+            payload['sign'] = get_sign(payload, MerchantPrivateKey)
 
-#                 response['result'] = "Withdrawal request sent successfully!"
+            url = os.environ['PAYOUT_URL']
+            resp = requests.post(url, json=payload, headers=headers).json()
+            print(resp,"---------------------------250")
+            # return resp
+            if resp.get("code") == "0000000":
+                if verify_sign(resp, PlatformPublicKey):
+                    print(resp,"-------------------------------150")
+                    return Response(resp, status=response.get('httpstatus'))
 
-
-
-#         except Exception as e:
-#             print(f"Error in the Sending the Withdrawal Pending Request: {str(e)}")
-#             response['status'] = 'error'
-#             response['errorcode'] = status.HTTP_400_BAD_REQUEST
-#             response['reason'] = str(e)
-#             response['httpstatus'] = status.HTTP_400_BAD_REQUEST
-#             return Response(response, status=response.get('httpstatus'))
+            return Response(response, status=response.get('httpstatus'))
+        except Exception as e:
+            print(f"Error in the Sending the Withdrawal Pending Request: {str(e)}")
+            response['status'] = 'error'
+            response['errorcode'] = status.HTTP_400_BAD_REQUEST
+            response['reason'] = str(e)
+            response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+            return Response(response, status=response.get('httpstatus'))
 
 
 #     def post(self, request):
