@@ -13,6 +13,7 @@ class WithdrawalApprovalSerializer(serializers.ModelSerializer):
             "walletAddress",
             "currency",
             "pspName",
+            "paymentMethod",
             "first_approval_by",
             "first_approval_action",
             "first_approval_at",
