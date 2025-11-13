@@ -66,6 +66,8 @@ JENA_PAY_ERROR_URL = os.environ.get('JENA_PAY_ERROR_URL')
 CHEEZEE_PAY_RETURN_URL = os.environ.get('CHEEZEE_PAY_RETURN_URL')
 CHEEZEE_PAYIN_WEBHOOK = os.environ.get('CHEEZEE_PAYIN_WEBHOOK')
 
+
+
 CRM_MANUAL_WITHDRAWAL_URL = os.environ.get('CRM_MANUAL_WITHDRAWAL_URL')
 
 # -----------------------------DB Connectiosn----------------------------
@@ -977,7 +979,7 @@ class CheezeePayUPIPayIN(APIView):
                 "name": str(ordRec.full_name),
                 "timestamp": str(int(time.time() * 1000)),
                 "notifyUrl": CHEEZEE_PAYIN_WEBHOOK,
-                "returnUrl": "https://trader.sgfx.com/sign-in",
+                "returnUrl": CHEEZEE_PAY_RETURN_URL,
                 "language": "en",
                 "email": str(ordRec.email),
                 "phone": str(userData.get('telephone'))
