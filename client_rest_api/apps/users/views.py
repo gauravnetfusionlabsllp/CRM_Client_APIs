@@ -71,6 +71,7 @@ class VerifyUserPhoneNumber(APIView):
             otp = data.get('otp')
             
             res = verify_otp(phoneNo, otp)
+           
             if res:
                 response['reason'] = "OTP Verified Successfully!!!!"
                 return Response(response, status=response.get('httpstatus'))

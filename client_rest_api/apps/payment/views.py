@@ -57,8 +57,6 @@ JENA_PAY_CANCEL_URL = os.environ.get('JENA_PAY_CANCEL_URL')
 JENA_PAY_EXPIRY_URL = os.environ.get('JENA_PAY_EXPIRY_URL')
 JENA_PAY_ERROR_URL = os.environ.get('JENA_PAY_ERROR_URL')
 
-print(JENA_PAY_PAYIN_WEBHOOK_URL,"--------------------------")
-
 # -------------------------Cheesee Pay-------------------------------
 
 CHEEZEE_PAY_RETURN_URL = os.environ.get('CHEEZEE_PAY_RETURN_URL')
@@ -69,10 +67,10 @@ CRM_MANUAL_WITHDRAWAL_URL = os.environ.get('CRM_MANUAL_WITHDRAWAL_URL')
 # -----------------------------DB Connectiosn----------------------------
 
 connection = mysql.connector.connect(
-    host="spectra-replica-db.cxq42qwo0p8j.eu-west-1.rds.amazonaws.com",
-    user="db_readonly",
-    password="67JQUZHmxbmU4tMn",
-    database="crmdb"
+    host= str(os.environ['CLIENT_DB_HOST']),
+    user= str(os.environ['CLIENT_DB_USER']),
+    password= str(os.environ['CLIENT_DB_PASSWORD']),
+    database= str(os.environ['CLIENT_DB_DATABASE'])
 )
 
 
@@ -703,7 +701,7 @@ class Match2PayPayInWebHook(APIView):
 
 # ----------------------------Jena PAY-------------------------------------------
 class JenaPayPayIn(APIView):
-    # @check_and_update_user_category 
+    
     def post(self, request):
         try:
             response = {"status": "success", "errorcode": "", "reason": "", "result":"", "httpstatus": status.HTTP_200_OK}
@@ -766,7 +764,7 @@ class JenaPayPayIn(APIView):
                 "operation": "purchase",
                 "methods": ["card"],
                 "session_expiry": 60,
-                "redirect_url": "https://3b58fc1fac82.ngrok-free.app/payment/jenapay-payin-webhook/",
+                "redirect_url": JENA_PAY_PAYIN_WEBHOOK_URL,
                 "success_url": JENA_PAY_SUCCESS_URL,
                 "cancel_url": JENA_PAY_CANCEL_URL,
                 "expiry_url": JENA_PAY_EXPIRY_URL,
@@ -785,7 +783,7 @@ class JenaPayPayIn(APIView):
                 "Content-Type": "application/json",
                 "Accept": "application/json"
             }
-            print(payload)
+
             url = JENA_PAY_PAYIN_URL
             resp = requests.post(url, headers=headers, json=payload)
             
@@ -797,7 +795,7 @@ class JenaPayPayIn(APIView):
                 return Response(response, status=response.get('httpstatus')) 
             
             data = resp.json()
-            print(resp,"---------------------------")
+            
             if "redirect_url" in data:
                 data["cashierLink"] = data.pop("redirect_url")
 
@@ -862,7 +860,6 @@ class JenaPayPayInCallBack(APIView):
             order_date = data.get("date")[0]
             order_tranactionId = data.get("arn")
  
-            print(order_number,"-----------150")
             orderId = str(uuid.UUID(order_number))
             orderData = (
                     OrderDetails.objects
@@ -895,6 +892,7 @@ class JenaPayPayInCallBack(APIView):
                 orderData.transactionId = str(order_tranactionId)
                 orderData.tradingId = str(crmRes['result']['brokerUserExternalId'])
                 orderData.save()
+                print("SUCCESS ---------------------------")
                 return Response({"code": "200", "msg": "success"}, status=status.HTTP_200_OK)
             
             return Response({"code": "200", "msg": "success"}, status=status.HTTP_200_OK)
@@ -957,7 +955,6 @@ class CheezeePayUPIPayIN(APIView):
                 order_type = "deposit"
             )
             
-            # print(CHEEZEE_PAYIN_WEBHOOK, "------------------------------")
             payload = {
                 "appId": os.environ['CHEEZEE_PAY_APP_ID'],
                 "merchantId": os.environ['CHEEZEE_PAY_MERCHANT_ID'],
