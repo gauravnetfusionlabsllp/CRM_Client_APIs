@@ -11,11 +11,7 @@ auth_token = os.environ['TWILIO_AUTH_TOKEN']
 
 def send_text_message(phoneNo):
     try:
-        formatNo = str("+"+phoneNo).replace(" ","")
-        print("======================== formatNo: ", formatNo)
-
-        otp = str(random.randint(100000, 999999))
-        cache.set(f"otp_{phoneNo}", otp, timeout=300)
+        formatNo = str("+"+phoneNo).replace(" ","") 
 
         client = Client(account_sid, auth_token)
 
@@ -23,15 +19,7 @@ def send_text_message(phoneNo):
             to=formatNo,
             channel="sms"
         )
-
-        # message = client.messages.create(
-        #     body = f"verify OTP!!! {otp}",
-        #     from_ = "+18203007188",
-        #     to = formatNo
-        # )
-
-        # print(message, "--------------------150")
-
+ 
         if not verify:
             return False
 
@@ -53,8 +41,7 @@ def verify_otp(phoneNo, otp):
             code=int(otp)
         )
 
-        print(check.status,"----------------------")
-        if not check:
+        if not check.valid:
             return False
         
         return True
