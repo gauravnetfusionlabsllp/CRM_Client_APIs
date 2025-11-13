@@ -14,6 +14,10 @@ from decimal import Decimal
 import time
 import os
 import requests
+import httpx
+import asyncio
+from asgiref.sync import async_to_sync, sync_to_async
+
 
 from apps.payment.models import OrderDetails
 
@@ -909,11 +913,21 @@ class JenaPayPayInCallBack(APIView):
 
 class CheezeePayUPIPayIN(APIView):
 
-    # @method_decorator(check_and_update_user_category)
     def post(self, request):
+        """Sync entrypoint (DRF-compatible), wraps async logic."""
+        return async_to_sync(self._async_post)(request)
+
+    async def _async_post(self, request):
         try:
-            response = {"status": "success", "errorcode": "", "reason": "", "result": "", "httpstatus": status.HTTP_200_OK}
-            data = request.data.get('data')
+            response = {
+                "status": "success",
+                "errorcode": "",
+                "reason": "",
+                "result": "",
+                "httpstatus": status.HTTP_200_OK
+            }
+
+            data = request.data.get('data', {})
             amount = data.get('amount')
             amountWithFees = data.get('amountWithFees')
             usdAmount = data.get('usdAmount')
@@ -921,40 +935,39 @@ class CheezeePayUPIPayIN(APIView):
             brokerUserId = data.get('brokerUserId')
 
             if not all([amount, authToken, brokerUserId, amountWithFees]):
-                response['status'] = 'error'
-                response['errorcode'] = status.HTTP_400_BAD_REQUEST
-                response['reason'] = "Amount, Broker, and brokerUserId are required fileds!!!"
-                response['httpstatus'] = status.HTTP_400_BAD_REQUEST
-                return Response(response, status=response.get('httpstatus'))
-            
+                response.update({
+                    "status": "error",
+                    "errorcode": status.HTTP_400_BAD_REQUEST,
+                    "reason": "Amount, Broker, and brokerUserId are required fields!!!",
+                    "httpstatus": status.HTTP_400_BAD_REQUEST
+                })
+                return Response(response, status=response["httpstatus"])
+
             user_id = request.session_user
-            cursor = connection.cursor(dictionary=True)
 
-            query = """
-                SELECT u.full_name, u.email, u.telephone, u.id FROM crmdb.users AS u where u.id = %s
-            """
-
-            params = (str(user_id),)
-            cursor.execute(query, params)
-            userData = cursor.fetchone()
-           
+            # Fetch user data asynchronously
+            userData = await self.get_user_data(user_id)
             if not userData:
-                response['status'] = 'error'
-                response['errorcode'] = status.HTTP_401_UNAUTHORIZED
-                response['reason'] = "User Deatils Not Found!"
-                response['httpstatus'] = status.HTTP_401_UNAUTHORIZED
-                return Response(response, status=response.get('httpstatus'))
-            
-            ordRec = OrderDetails.objects.create(
-                userId = str(userData.get('id')),
-                full_name = str(userData.get('full_name')),
-                email = str(userData.get('email')),
-                brokerUserId = str(brokerUserId),
-                amount = amount,
-                pspName = "CheezeePay UPI",
-                order_type = "deposit"
+                response.update({
+                    "status": "error",
+                    "errorcode": status.HTTP_401_UNAUTHORIZED,
+                    "reason": "User Details Not Found!",
+                    "httpstatus": status.HTTP_401_UNAUTHORIZED
+                })
+                return Response(response, status=response["httpstatus"])
+
+            # Create order record (use sync_to_async to avoid blocking)
+            OrderDetails_create = sync_to_async(OrderDetails.objects.create)
+            ordRec = await OrderDetails_create(
+                userId=str(userData.get('id')),
+                full_name=str(userData.get('full_name')),
+                email=str(userData.get('email')),
+                brokerUserId=str(brokerUserId),
+                amount=amount,
+                pspName="CheezeePay UPI",
+                order_type="deposit"
             )
-            
+
             payload = {
                 "appId": os.environ['CHEEZEE_PAY_APP_ID'],
                 "merchantId": os.environ['CHEEZEE_PAY_MERCHANT_ID'],
@@ -971,25 +984,28 @@ class CheezeePayUPIPayIN(APIView):
             }
 
             payload['sign'] = get_sign(payload, MerchantPrivateKey)
-
             url = os.environ['PAYIN_URL']
-            resp = requests.post(url, json=payload, headers=headers).json()
-            
-            if resp.get('code') != "000000":
-                response['status'] = "error"
-                response['errorcode'] = status.HTTP_400_BAD_REQUEST
-                response['reason'] = 'Error inn Payment Check In.'
-                response['httpstatus'] = status.HTTP_400_BAD_REQUEST
-                return Response(response, status=status.HTTP_400_BAD_REQUEST)
-            
-            if verify_sign(resp.copy(), PlatformPublicKey):
-                
-                header = {
-                    "Content-Type": "application/json",
-                    "x-crm-api-token": str(CRM_AUTH_TOKEN)
-                }
 
-                payload = {
+            # Async HTTP call
+            async with httpx.AsyncClient(timeout=5) as client:
+                cheezee_resp = await client.post(url, json=payload, headers=headers)
+
+            resp = cheezee_resp.json()
+            print(resp,"--------------------150")
+
+            if resp.get('code') != "000000":
+                response.update({
+                    "status": "error",
+                    "errorcode": status.HTTP_400_BAD_REQUEST,
+                    "reason": "Error in Payment Check In.",
+                    "httpstatus": status.HTTP_400_BAD_REQUEST
+                })
+                return Response(response, status=response["httpstatus"])
+
+            # Verify signature
+            if verify_sign(resp.copy(), PlatformPublicKey):
+
+                crm_payload = {
                     "brokerUserId": brokerUserId,
                     "amount": int(usdAmount * 100),
                     "method": 17,
@@ -1004,32 +1020,47 @@ class CheezeePayUPIPayIN(APIView):
                     "brandExternalId": payload.get('mchOrderNo')
                 }
 
-                crmRes = requests.post(str(CRM_MANUAL_DEPOSIT_URL), json=payload, headers=header).json()
+                header = {
+                    "Content-Type": "application/json",
+                    "x-crm-api-token": str(CRM_AUTH_TOKEN)
+                }
 
-                if crmRes['result']['success']:
-                    ordRec.brokerBankingId = str(crmRes['result']['result']['id'])
-                    ordRec.save()
-                    response['result'] = {
-                        "data": resp,
-                        "crmAPI": crmRes
-                    }
+                async with httpx.AsyncClient(timeout=5) as client:
+                    crmRes = (await client.post(str(CRM_MANUAL_DEPOSIT_URL), json=crm_payload, headers=header)).json()
 
-                    return Response(response, status=response.get('httpstatus'))
-        
-            response['result'] = {
-                "data": resp
-            }
+                if crmRes.get("result", {}).get("success"):
+                    ordRec.brokerBankingId = str(crmRes["result"]["result"]["id"])
+                    await sync_to_async(ordRec.save)()
+                    response["result"] = {"data": resp, "crmAPI": crmRes}
+                    return Response(response, status=response["httpstatus"])
 
-            return Response(response, status=response.get('httpstatus'))
-        
+            response["result"] = {"data": resp}
+            return Response(response, status=response["httpstatus"])
+
         except Exception as e:
-            print(f"Error in the Currency Pay In: {str(e)}")
-            response['status'] = 'error'
-            response['errorcode'] = status.HTTP_400_BAD_REQUEST
-            response['reason'] = str(e)
-            response['httpstatus'] = status.HTTP_400_BAD_REQUEST
-            return Response(response, status=response.get('httpstatus'))
+            print(f"Error in CheezeePay Pay In: {str(e)}")
+            response.update({
+                "status": "error",
+                "errorcode": status.HTTP_400_BAD_REQUEST,
+                "reason": str(e),
+                "httpstatus": status.HTTP_400_BAD_REQUEST
+            })
+            return Response(response, status=response["httpstatus"])
 
+
+    async def get_user_data(self, user_id):
+        """Fetch user data asynchronously."""
+        @sync_to_async
+        def fetch():
+            with connection.cursor(dictionary=True) as cursor:
+                query = """
+                    SELECT u.full_name, u.email, u.telephone, u.id
+                    FROM crmdb.users AS u WHERE u.id = %s
+                """
+                cursor.execute(query, (str(user_id),))
+                return cursor.fetchone()
+
+        return await fetch()
 
 
 
