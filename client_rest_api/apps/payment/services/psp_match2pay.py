@@ -89,7 +89,7 @@ class Match2PayPSP:
 
             # ✅ Send POST request
             response = requests.post(
-                "https://wallet-staging.match2pay.com/api/v2/payment/withdrawal",
+                MATCH2PAY_PAYOUT_URL,
                 headers=headers,
                 data=json.dumps(request_body)
             )

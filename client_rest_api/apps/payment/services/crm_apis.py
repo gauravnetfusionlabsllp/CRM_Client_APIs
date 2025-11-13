@@ -136,7 +136,7 @@ class CRM:
         try:
             print(str(CRM_GET_TRANSACTIONS_URL))
             print(payload)
-            headers['x-auth-token'] = 'c1a35cc7c389c9057f1ea6d5272155536cec413a193d54cb1e03de64ae553112'
+            # headers['x-auth-token'] = 'c1a35cc7c389c9057f1ea6d5272155536cec413a193d54cb1e03de64ae553112'
             print(headers)
             response = requests.post(str(CRM_GET_TRANSACTIONS_URL), json=payload ,headers=headers)
             print(response)

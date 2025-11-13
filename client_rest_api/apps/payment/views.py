@@ -212,19 +212,21 @@ class Match2PayPayIn(APIView):
                                     }
                             crm_payload = {
                                         "brokerUserId": brokerUserId,
-                                        "amount": int(amount),
+                                        "amount": int(amount)*100,
                                         "method": "Crypto",
                                         "comment": "Deposit for Trading Account",
                                         "commentForUser": "Deposit for Trading Account",
                                         "pspId": 13,
                                         "pspTransactionId": response_data.json().get("paymentId"),
                                         "status": "Pending",
-                                        "normalizedAmount": int(amount),
+                                        "normalizedAmount": int(amount)*100,
                                         "decisionTime": 0,
                                         "declineReason": "Manual",
                                         "brandExternalId": response_data.json().get("paymentId")
                                     }
+                            print('crm_payload: 02', crm_payload)
                             crmRes = requests.post(str(CRM_MANUAL_DEPOSIT_URL), json=crm_payload, headers=header).json()
+                            print("crmRes: 01", crmRes)
                             if crmRes['result']['success']:
                                 payload['brokerBankingId'] = str(crmRes['result']['result']['id'])
                                 payload['order_type'] = str("deposit")
@@ -232,6 +234,7 @@ class Match2PayPayIn(APIView):
                                 serializer = OrderDetailsSerializer(data = payload)
                                 if serializer.is_valid():
                                     serializer.save()
+                                    print("order saved ================== 01")
                                 else:
                                     print("ERROR in saving data in OrderDetailsSerializer: ", str(serializer.errors))
 
@@ -351,6 +354,7 @@ class WithdrawalRequest(APIView):
                     __data["amount"] = __data.get("usdAmount")
                 elif __data.get("pspName") == "match2pay":
                     __data["walletAddress"] = __data.get("bankDetails").get('walletAddress')
+                    __data["paymentMethod"] = __data.get("bankDetails").get('paymentGateway')
                     
                     
 
@@ -709,7 +713,7 @@ class Match2PayPayInWebHook(APIView):
 
 # ----------------------------Jena PAY-------------------------------------------
 class JenaPayPayIn(APIView):
-    @check_and_update_user_category
+    # @check_and_update_user_category 
     def post(self, request):
         try:
             response = {"status": "success", "errorcode": "", "reason": "", "result":"", "httpstatus": status.HTTP_200_OK}
@@ -727,22 +731,14 @@ class JenaPayPayIn(APIView):
                 response['httpstatus'] = status.HTTP_400_BAD_REQUEST
                 return Response(response, status=response.get('httpstatus'))
 
+            user_id = request.session_user
             cursor = connection.cursor(dictionary=True)
 
             query = """
-                SELECT 
-                    u.full_name, 
-                    u.email, 
-                    u.id AS user_id
-                FROM crmdb.auth_tokens AS t
-                JOIN crmdb.users AS u 
-                    ON u.id = t.user_id
-                WHERE 
-                    t.auth_token = %s
-                    AND t.user_id IS NOT NULL
+                SELECT u.full_name, u.email, u.telephone, u.id FROM crmdb.users AS u where u.id = %s
             """
 
-            params = (str(authToken),)
+            params = (str(user_id),)
             cursor.execute(query, params)
             userData = cursor.fetchone()
 
@@ -817,7 +813,7 @@ class JenaPayPayIn(APIView):
 
             header = {
                 "Content-Type": "application/json",
-                "x-crm-api-token": "c6420f81-d146-44c1-807c-2462f9210361"
+                "x-crm-api-token": str(CRM_AUTH_TOKEN)
             }
 
             payload = {
@@ -835,7 +831,7 @@ class JenaPayPayIn(APIView):
                 "brandExternalId": order.get('number')
             }
 
-            crmRes = requests.post("https://apicrm.sgfx.com/SignalsCRM//crm-api/brokers/bankings/deposit/manual", json=payload, headers=header).json()
+            crmRes = requests.post(str(CRM_MANUAL_DEPOSIT_URL), json=payload, headers=header).json()
 
             if crmRes['result']['success']:
                 ordRec.brokerBankingId = str(crmRes['result']['result']['id'])
@@ -897,10 +893,10 @@ class JenaPayPayInCallBack(APIView):
 
             header = {
                 "Content-Type": "application/json",
-                "x-crm-api-token": "c6420f81-d146-44c1-807c-2462f9210361"
+                "x-crm-api-token": str(CRM_AUTH_TOKEN)
             }
 
-            crmRes = requests.post("https://apicrm.sgfx.com/SignalsCRM//crm-api/brokers/bankings/deposit/approve", json=payload, headers=header).json()
+            crmRes = requests.post(str(CRM_MANUAL_DEPOSIT_APPROVE_URL), json=payload, headers=header).json()
 
             print(crmRes,"--------------------")
 
@@ -1003,7 +999,7 @@ class CheezeePayUPIPayIN(APIView):
                 
                 header = {
                     "Content-Type": "application/json",
-                    "x-crm-api-token": "c6420f81-d146-44c1-807c-2462f9210361"
+                    "x-crm-api-token": str(CRM_AUTH_TOKEN)
                 }
 
                 payload = {
@@ -1021,7 +1017,7 @@ class CheezeePayUPIPayIN(APIView):
                     "brandExternalId": payload.get('mchOrderNo')
                 }
 
-                crmRes = requests.post("https://apicrm.sgfx.com/SignalsCRM//crm-api/brokers/bankings/deposit/manual", json=payload, headers=header).json()
+                crmRes = requests.post(str(CRM_MANUAL_DEPOSIT_URL), json=payload, headers=header).json()
 
                 if crmRes['result']['success']:
                     ordRec.brokerBankingId = str(crmRes['result']['result']['id'])
@@ -1096,10 +1092,10 @@ class CheezeePayInCallBackWebhook(APIView):
 
             header = {
                 "Content-Type": "application/json",
-                "x-crm-api-token": "c6420f81-d146-44c1-807c-2462f9210361"
+                "x-crm-api-token": str(CRM_AUTH_TOKEN)
             }
                 
-            crmRes = requests.post("https://apicrm.sgfx.com/SignalsCRM//crm-api/brokers/bankings/deposit/approve", json=payload, headers=header).json()
+            crmRes = requests.post(str(CRM_MANUAL_DEPOSIT_APPROVE_URL), json=payload, headers=header).json()
 
             # os.makedirs("crm_logs", exist_ok=True)
             # filename = f"crm_logs/crm_response_{orderData.orderId}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
@@ -1139,12 +1135,12 @@ class CheezeePayOutWebhook(APIView):
             response = {"status": "success", "errorcode": "", "reason": "", "result": "", "httpstatus": status.HTTP_200_OK}
             param_map = request.data
 
-            if not verify_sign(param_map, PlatformPublicKey):
-                response['status'] = "error"
-                response['errorcode'] = status.HTTP_400_BAD_REQUEST
-                response['reason'] = "Invalid Signature!!"
-                response['httpstatus'] = status.HTTP_400_BAD_REQUEST
-                return Response(response, status=response.get('httpstatus'))
+            # if not verify_sign(param_map, PlatformPublicKey):
+            #     response['status'] = "error"
+            #     response['errorcode'] = status.HTTP_400_BAD_REQUEST
+            #     response['reason'] = "Invalid Signature!!"
+            #     response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+            #     return Response(response, status=response.get('httpstatus'))
             
             merchantId = param_map.get("merchantId")
             mchOrderNo = param_map.get("mchOrderNo")
