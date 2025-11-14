@@ -336,7 +336,7 @@ class WithdrawalRequest(APIView):
                         "email" : __data["email"],
                         "brokerUserId" : __data["brokerUserId"],
                         "transactionId" : crmRes.get("result").get("id"),
-                        "amount" : __data["usdAmount"] if __data.get("pspName") == "cheezepay" else __data["amount"],
+                        "amount" : __data["amount"] if __data.get("pspName") == "cheezepay" else __data["amount"],
                         "order_type" : "withdrawal",
                         "status" : 'PENDING',
                         "tradingId" : crmRes.get("result").get("brokerUserExternalId"),
@@ -355,7 +355,7 @@ class WithdrawalRequest(APIView):
 
                 __data["brokerBankingId"] = crmRes.get("result").get("id")
                 if __data.get("pspName") == "cheezepay":
-                    __data["amount"] = __data.get("usdAmount")
+                    __data["amount"] = __data.get("amount")
                 elif __data.get("pspName") == "match2pay":
                     __data["walletAddress"] = __data.get("bankDetails").get('walletAddress')
                     __data["paymentMethod"] = __data.get("bankDetails").get('paymentGateway')
@@ -383,7 +383,7 @@ class WithdrawalRequest(APIView):
         try:
             response = {"status": "success", "errorcode": "", "reason": "", "result":"", "httpstatus": status.HTTP_200_OK}
             __data = request.data.get('data')
-            amountWithFees = __data.get('amountWithFees')
+            finalInrAmount = __data.get('finalInrAmount')
             # usdAmount = __data.get('usdAmount')
             if __data:
                 response_message = {}
@@ -487,7 +487,7 @@ class WithdrawalRequest(APIView):
                             response['httpstatus'] = status.HTTP_400_BAD_REQUEST
                             return Response(response, status=400)
                         try:
-                            psp_response = psp.payout(approval, amountWithFees)
+                            psp_response = psp.payout(approval, finalInrAmount)
                             print("PSP Response:", psp_response)
                             if isinstance(psp_response, dict) and psp_response.get("success") is True or psp_response.get('msg') == "success":
                                 response_message["psp_payout"] = "Payout Successful!"
@@ -1003,7 +1003,7 @@ class CheezeePayUPIPayIN(APIView):
                 cheezee_resp = await client.post(url, json=payload, headers=headers)
 
             resp = cheezee_resp.json()
-            print(resp,"--------------------150")
+
 
             if resp.get('code') != "000000":
                 response.update({
@@ -1039,7 +1039,7 @@ class CheezeePayUPIPayIN(APIView):
 
                 async with httpx.AsyncClient(timeout=5) as client:
                     crmRes = (await client.post(str(CRM_MANUAL_DEPOSIT_URL), json=crm_payload, headers=header)).json()
-
+ 
                 if crmRes.get("result", {}).get("success"):
                     ordRec.brokerBankingId = str(crmRes["result"]["result"]["id"])
                     await sync_to_async(ordRec.save)()
