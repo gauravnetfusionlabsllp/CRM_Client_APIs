@@ -11,7 +11,8 @@ class AuthTokenMiddleware(MiddlewareMixin):
             '/payment/match2pay-pay-out-webhook/',
             '/payment/match2pay-pay-in-webhook/',
             '/payment/cheezeepay-upi-payout-webhook/',
-            '/payment/cheezeepay-upi-payin-webhook/'
+            '/payment/cheezeepay-upi-payin-webhook/',
+            '/payment/jenapay-payin-webhook/'
         ]
 
     def process_request(self, request):
