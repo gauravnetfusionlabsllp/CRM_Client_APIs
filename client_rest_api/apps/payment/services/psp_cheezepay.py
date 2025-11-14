@@ -60,7 +60,7 @@ class CheezePayPSP:
                 "appId": os.environ['CHEEZEE_PAY_APP_ID'],
                 "merchantId": os.environ['CHEEZEE_PAY_MERCHANT_ID'],
                 "mchOrderNo": str(data.ordertransactionid.orderId).replace("-",""),
-                "paymentMethod": "P2P",
+                "paymentMethod": "BANK_IN",
                 "amount": str(amount),
                 "name": __user_data.get('full_name'),
                 "email": __user_data.get('email'),
