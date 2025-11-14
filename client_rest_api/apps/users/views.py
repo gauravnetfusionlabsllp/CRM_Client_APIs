@@ -9,6 +9,8 @@ from rest_framework import status
 from apps.core.WhatsAppLink import create_whatsapp_link
 from django.core.cache import cache
 
+from apps.dashboard_admin.models import WithdrawalApprovals
+
 import tempfile
 import os
 from apps.users.helper.extractai import *
@@ -66,12 +68,50 @@ class VerifyUserPhoneNumber(APIView):
         try:
             response = {"status": "success", "errorcode": "", "reason": "", "result": "", "httpstatus": status.HTTP_200_OK}
 
+            event = request.data.get('event')
             data = request.data.get('data')
             phoneNo = data.get('phoneNo')
             otp = data.get('otp')
+
+            
+            if event == "withdrawal-OTP":
+                transId = data.get('transId')
+                if not transId:
+                    response['status'] = 'error'
+                    response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                    response['reason'] = "Transaction ID is Required!!!"
+                    response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                    return Response(response, status=response.get('httpstatus'))
+                
+                try:
+                    withObj = WithdrawalApprovals.objects.get(brokerBankingId=transId)
+                except WithdrawalApprovals.DoesNotExist:
+                    response = {
+                        'status': 'error',
+                        'errorcode': status.HTTP_400_BAD_REQUEST,
+                        'reason': "Such Transaction Doesn't Exist!!!",
+                        'httpstatus': status.HTTP_400_BAD_REQUEST
+                    }
+                    return Response(response, status=response['httpstatus'])
+                
+                res = verify_otp(phoneNo, otp)
+                if res:
+                    if not withObj.otpVerified:
+                        withObj.otpVerified = True
+                        withObj.save()
+                        response['reason'] = "OTP Verified Successfully!!!!"
+                        return Response(response, status=response.get('httpstatus'))
+                    
+                    response['reason'] = "Withdrawal Order Already Verified!!"
+                    return Response(response, status=response.get('httpstatus'))
+                
+                response['status'] = 'error'
+                response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                response['reason'] = "Invalid OTP!!!!"
+                response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                return Response(response, status=response.get('httpstatus'))
             
             res = verify_otp(phoneNo, otp)
-           
             if res:
                 response['reason'] = "OTP Verified Successfully!!!!"
                 return Response(response, status=response.get('httpstatus'))

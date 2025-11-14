@@ -17,7 +17,7 @@ load_dotenv()
 class CheezePayPSP:
     BASE_URL = "url"
 
-    def payout(self, approval, amountWithFees):
+    def payout(self, approval, finalInrAmount):
         print("CheezePayPSP: called")
         try:
             response = {"status": "success", "errorcode": "", "reason": "", "result": "", "httpstatus": status.HTTP_200_OK}
@@ -26,8 +26,7 @@ class CheezePayPSP:
             # print(data, "------------------250")
             bankDetails = data.bankDetails
 
-            amount = amountWithFees
-            print(amount,"------------350")
+            amount = finalInrAmount
 
             query =f"""
                 SELECT
@@ -48,7 +47,7 @@ class CheezePayPSP:
             __user_data = DBConnection._forFetchingJson(query, using='replica')
             __user_data = __user_data[0]
 
-            print(data.ordertransactionid.orderId, "---------------150")
+            print(data.ordertransactionid.orderId, "---------------Order Id")
             account_infos = {
                     "name":bankDetails.get('accountName'),
                     "accountNumber": bankDetails.get('accountNumber'),
@@ -61,7 +60,7 @@ class CheezePayPSP:
                 "appId": os.environ['CHEEZEE_PAY_APP_ID'],
                 "merchantId": os.environ['CHEEZEE_PAY_MERCHANT_ID'],
                 "mchOrderNo": str(data.ordertransactionid.orderId).replace("-",""),
-                "paymentMethod": "BANK_IN",
+                "paymentMethod": "P2P",
                 "amount": str(amount),
                 "name": __user_data.get('full_name'),
                 "email": __user_data.get('email'),
@@ -71,7 +70,7 @@ class CheezePayPSP:
                 "timestamp": str(int(time.time() * 1000))
             }
             payload['sign'] = get_sign(payload, MerchantPrivateKey)
-
+            print(payload,"--------------------------------")
             url = os.environ['PAYOUT_URL']
             resp = requests.post(url, json=payload, headers=headers).json()
             print(resp,"---------------------------250")

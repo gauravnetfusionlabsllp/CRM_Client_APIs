@@ -22,7 +22,7 @@ from apps.payment.services.psp_mat2pay_methods import payment_getway
 class Match2PayPSP:
     BASE_URL = "url"
 
-    def payout(self, approval, amountWithFees=None):
+    def payout(self, approval, finalInrAmount=None):
         print("Match2PayPSP: called")
         response = {"status": "success", "errorcode": "", "reason": "", "result":"", "httpstatus": status.HTTP_200_OK}
         try:
