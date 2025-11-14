@@ -1176,12 +1176,12 @@ class CheezeePayOutWebhook(APIView):
             response = {"status": "success", "errorcode": "", "reason": "", "result": "", "httpstatus": status.HTTP_200_OK}
             param_map = request.data
 
-            # if not verify_sign(param_map, PlatformPublicKey):
-            #     response['status'] = "error"
-            #     response['errorcode'] = status.HTTP_400_BAD_REQUEST
-            #     response['reason'] = "Invalid Signature!!"
-            #     response['httpstatus'] = status.HTTP_400_BAD_REQUEST
-            #     return Response(response, status=response.get('httpstatus'))
+            if not verify_sign(param_map, PlatformPublicKey):
+                response['status'] = "error"
+                response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                response['reason'] = "Invalid Signature!!"
+                response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                return Response(response, status=response.get('httpstatus'))
             
             merchantId = param_map.get("merchantId")
             mchOrderNo = param_map.get("mchOrderNo")
