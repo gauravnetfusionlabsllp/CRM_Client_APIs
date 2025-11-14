@@ -55,7 +55,7 @@ class GettingUnseriInfoMiddleware(MiddlewareMixin):
 
     def process_request(self, request):
 
-        if not any(request.path.startswith(url) for url in self.target_urls):
+        if not any(request.path.endswith(url) for url in self.target_urls):
             return None
         
         if not request.headers.get("Auth-Token"):
