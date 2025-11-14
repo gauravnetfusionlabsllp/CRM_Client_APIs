@@ -66,6 +66,8 @@ JENA_PAY_ERROR_URL = os.environ.get('JENA_PAY_ERROR_URL')
 CHEEZEE_PAY_RETURN_URL = os.environ.get('CHEEZEE_PAY_RETURN_URL')
 CHEEZEE_PAYIN_WEBHOOK = os.environ.get('CHEEZEE_PAYIN_WEBHOOK')
 
+
+
 CRM_MANUAL_WITHDRAWAL_URL = os.environ.get('CRM_MANUAL_WITHDRAWAL_URL')
 
 # -----------------------------DB Connectiosn----------------------------
@@ -81,8 +83,10 @@ connection = mysql.connector.connect(
 # Create your views here.
 # --------------------------- MATCH 2 PAY -----------------------------------
 MATCH2PAY_PAYIN_URL = os.environ.get('MATCH2PAY_PAYIN_URL')
-MATCH2PAY_API_SECRETE = os.environ.get('MATCH2PAY_API_SECRETE')
-MATCH2PAY_PAY_API_TOKEN = os.environ.get('MATCH2PAY_PAY_API_TOKEN')
+MATCH2PAY_API_SECRETE_S = os.environ.get('MATCH2PAY_API_SECRETE_S')
+MATCH2PAY_API_SECRETE_M = os.environ.get('MATCH2PAY_API_SECRETE_M')
+MATCH2PAY_PAY_API_TOKEN_S = os.environ.get('MATCH2PAY_PAY_API_TOKEN_S')
+MATCH2PAY_PAY_API_TOKEN_M = os.environ.get('MATCH2PAY_PAY_API_TOKEN_M')
 MATCH2PAY_CALLBACK_URL = os.environ.get('MATCH2PAY_CALLBACK_URL')
 MATCH2PAY_FAILURE_URL = os.environ.get('MATCH2PAY_FAILURE_URL')
 MATCH2PAY_SUCCESS_URL = os.environ.get('MATCH2PAY_SUCCESS_URL')
@@ -95,6 +99,13 @@ class Match2PayPayIn(APIView):
     def post(self, request):
         response = {"status": "success", "errorcode": "", "reason": "", "result":"", "httpstatus": status.HTTP_200_OK}
         try:
+            print("request.registration_app --------", request.registration_app)
+            if request.registration_app == 2:
+                MATCH2PAY_API_SECRETE = MATCH2PAY_API_SECRETE_S
+                MATCH2PAY_PAY_API_TOKEN = MATCH2PAY_PAY_API_TOKEN_S
+            else:
+                MATCH2PAY_API_SECRETE = MATCH2PAY_API_SECRETE_M
+                MATCH2PAY_PAY_API_TOKEN = MATCH2PAY_PAY_API_TOKEN_M
             request_body = request.data.get('data')
             print("request_body: ", request_body)
             amount = request_body.get('amount')
@@ -170,6 +181,8 @@ class Match2PayPayIn(APIView):
 
             # request_body = request.data.get('data')
             serializer = PaymentRequestSerializer(data=payment_payload)
+            print("MATCH2PAY_PAY_API_TOKEN: ", MATCH2PAY_PAY_API_TOKEN)
+            print("MATCH2PAY_API_SECRETE: ", MATCH2PAY_API_SECRETE)
             if serializer.is_valid():
                 # print(serializer.validated_data)
                 serialized_data = serializer.validated_data
@@ -334,7 +347,7 @@ class WithdrawalRequest(APIView):
                         "email" : __data["email"],
                         "brokerUserId" : __data["brokerUserId"],
                         "transactionId" : crmRes.get("result").get("id"),
-                        "amount" : __data["usdAmount"] if __data.get("pspName") == "cheezepay" else __data["amount"],
+                        "amount" : __data["amount"] if __data.get("pspName") == "cheezepay" else __data["amount"],
                         "order_type" : "withdrawal",
                         "status" : 'PENDING',
                         "tradingId" : crmRes.get("result").get("brokerUserExternalId"),
@@ -353,7 +366,7 @@ class WithdrawalRequest(APIView):
 
                 __data["brokerBankingId"] = crmRes.get("result").get("id")
                 if __data.get("pspName") == "cheezepay":
-                    __data["amount"] = __data.get("usdAmount")
+                    __data["amount"] = __data.get("amount")
                 elif __data.get("pspName") == "match2pay":
                     __data["walletAddress"] = __data.get("bankDetails").get('walletAddress')
                     __data["paymentMethod"] = __data.get("bankDetails").get('paymentGateway')
@@ -381,7 +394,7 @@ class WithdrawalRequest(APIView):
         try:
             response = {"status": "success", "errorcode": "", "reason": "", "result":"", "httpstatus": status.HTTP_200_OK}
             __data = request.data.get('data')
-            amountWithFees = __data.get('amountWithFees')
+            finalInrAmount = __data.get('finalInrAmount')
             # usdAmount = __data.get('usdAmount')
             if __data:
                 response_message = {}
@@ -485,7 +498,7 @@ class WithdrawalRequest(APIView):
                             response['httpstatus'] = status.HTTP_400_BAD_REQUEST
                             return Response(response, status=400)
                         try:
-                            psp_response = psp.payout(approval, amountWithFees)
+                            psp_response = psp.payout(approval, finalInrAmount)
                             print("PSP Response:", psp_response)
                             if isinstance(psp_response, dict) and psp_response.get("success") is True or psp_response.get('msg') == "success":
                                 response_message["psp_payout"] = "Payout Successful!"
@@ -987,7 +1000,7 @@ class CheezeePayUPIPayIN(APIView):
                 "name": str(ordRec.full_name),
                 "timestamp": str(int(time.time() * 1000)),
                 "notifyUrl": CHEEZEE_PAYIN_WEBHOOK,
-                "returnUrl": "https://trader.sgfx.com/sign-in",
+                "returnUrl": CHEEZEE_PAY_RETURN_URL,
                 "language": "en",
                 "email": str(ordRec.email),
                 "phone": str(userData.get('telephone'))
@@ -1001,7 +1014,7 @@ class CheezeePayUPIPayIN(APIView):
                 cheezee_resp = await client.post(url, json=payload, headers=headers)
 
             resp = cheezee_resp.json()
-            print(resp,"--------------------150")
+
 
             if resp.get('code') != "000000":
                 response.update({
@@ -1037,7 +1050,7 @@ class CheezeePayUPIPayIN(APIView):
 
                 async with httpx.AsyncClient(timeout=5) as client:
                     crmRes = (await client.post(str(CRM_MANUAL_DEPOSIT_URL), json=crm_payload, headers=header)).json()
-
+ 
                 if crmRes.get("result", {}).get("success"):
                     ordRec.brokerBankingId = str(crmRes["result"]["result"]["id"])
                     await sync_to_async(ordRec.save)()
@@ -1264,6 +1277,81 @@ class CheezeePayUPIPayOut(APIView):
             response['httpstatus'] = status.HTTP_400_BAD_REQUEST
             return Response(response, status=response.get('httpstatus'))
 
+
+
+
+class BankingDetailsRequest(APIView):
+    # @check_user_permissions
+    def get(self, request):
+        response = {"status": "success", "errorcode": "", "reason": "", "result": "", "httpstatus": status.HTTP_200_OK}
+        try:
+            # ✅ Optional filtering by userid or pspName
+            userid = request.session_user
+            print('userid: ', userid)
+            pspName = request.query_params.get('pspName', None)
+
+            queryset = BankingDetails.objects.all().order_by('-id')
+
+            if userid:
+                queryset = queryset.filter(userid=userid)
+            if pspName:
+                queryset = queryset.filter(pspName=pspName)
+
+            # ✅ Serialize all matching records
+            serializer = BankingDetailsSerializer(queryset, many=True)
+
+            response["result"] = {
+                "records": serializer.data,
+                "totalRecords": queryset.count()
+            }
+
+            return Response(response, status=response.get('httpstatus'))
+
+        except Exception as e:
+            response["status"] = "error"
+            response["errorcode"] = status.HTTP_400_BAD_REQUEST
+            response["reason"] = str(e)
+            response["result"] = []
+            response["httpstatus"] = status.HTTP_400_BAD_REQUEST
+            return Response(response, status=response.get('httpstatus'))
+
+    # @check_user_permissions
+    def post(self, request):
+        response = {"status": "success", "errorcode": "", "reason": "", "result": "", "httpstatus": status.HTTP_200_OK}
+        try:
+            __data = request.data.get('data', {})
+            user_id = request.session_user  # assuming your session stores user id
+            __data["userid"] = user_id
+
+            # Set timestamps
+            __data["created_at"] = timezone.now()
+            __data["updated_at"] = timezone.now()
+
+            # Map wallet details for crypto payments
+            if __data.get("paymentMethod") == "crypto" and "bankDetails" in __data:
+                __data["walletAddress"] = __data["bankDetails"].get("walletAddress")
+                __data["paymentMethod"] = __data.get("paymentMethod")
+
+            print(__data)
+            serializer = BankingDetailsSerializer(data=__data)
+            if serializer.is_valid():
+                serializer.save()
+                response["result"] = "Banking details added successfully."
+            else:
+                response["status"] = "error"
+                response["errorcode"] = status.HTTP_400_BAD_REQUEST
+                response["reason"] = str(serializer.errors)
+                response["httpstatus"] = status.HTTP_400_BAD_REQUEST
+
+            return Response(response, status=response.get('httpstatus'))
+
+        except Exception as e:
+            response["status"] = "error"
+            response["errorcode"] = status.HTTP_400_BAD_REQUEST
+            response["reason"] = str(e)
+            response["result"] = []
+            response["httpstatus"] = status.HTTP_400_BAD_REQUEST
+            return Response(response, status=response.get('httpstatus'))
 
 #     def post(self, request):
 #         try:
