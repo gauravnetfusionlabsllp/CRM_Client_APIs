@@ -96,6 +96,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'client_rest_api.middlewares.auth_middlware.AuthTokenMiddleware',
+    'client_rest_api.middlewares.auth_middlware.GettingUnseriInfoMiddleware',
 ]
 
 ROOT_URLCONF = 'client_rest_api.urls'

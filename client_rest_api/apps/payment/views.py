@@ -81,8 +81,10 @@ connection = mysql.connector.connect(
 # Create your views here.
 # --------------------------- MATCH 2 PAY -----------------------------------
 MATCH2PAY_PAYIN_URL = os.environ.get('MATCH2PAY_PAYIN_URL')
-MATCH2PAY_API_SECRETE = os.environ.get('MATCH2PAY_API_SECRETE')
-MATCH2PAY_PAY_API_TOKEN = os.environ.get('MATCH2PAY_PAY_API_TOKEN')
+MATCH2PAY_API_SECRETE_S = os.environ.get('MATCH2PAY_API_SECRETE_S')
+MATCH2PAY_API_SECRETE_M = os.environ.get('MATCH2PAY_API_SECRETE_M')
+MATCH2PAY_PAY_API_TOKEN_S = os.environ.get('MATCH2PAY_PAY_API_TOKEN_S')
+MATCH2PAY_PAY_API_TOKEN_M = os.environ.get('MATCH2PAY_PAY_API_TOKEN_M')
 MATCH2PAY_CALLBACK_URL = os.environ.get('MATCH2PAY_CALLBACK_URL')
 MATCH2PAY_FAILURE_URL = os.environ.get('MATCH2PAY_FAILURE_URL')
 MATCH2PAY_SUCCESS_URL = os.environ.get('MATCH2PAY_SUCCESS_URL')
@@ -95,6 +97,13 @@ class Match2PayPayIn(APIView):
     def post(self, request):
         response = {"status": "success", "errorcode": "", "reason": "", "result":"", "httpstatus": status.HTTP_200_OK}
         try:
+            print("request.registration_app --------", request.registration_app)
+            if request.registration_app == 2:
+                MATCH2PAY_API_SECRETE = MATCH2PAY_API_SECRETE_S
+                MATCH2PAY_PAY_API_TOKEN = MATCH2PAY_PAY_API_TOKEN_S
+            else:
+                MATCH2PAY_API_SECRETE = MATCH2PAY_API_SECRETE_M
+                MATCH2PAY_PAY_API_TOKEN = MATCH2PAY_PAY_API_TOKEN_M
             request_body = request.data.get('data')
             print("request_body: ", request_body)
             amount = request_body.get('amount')
@@ -170,6 +179,8 @@ class Match2PayPayIn(APIView):
 
             # request_body = request.data.get('data')
             serializer = PaymentRequestSerializer(data=payment_payload)
+            print("MATCH2PAY_PAY_API_TOKEN: ", MATCH2PAY_PAY_API_TOKEN)
+            print("MATCH2PAY_API_SECRETE: ", MATCH2PAY_API_SECRETE)
             if serializer.is_valid():
                 # print(serializer.validated_data)
                 serialized_data = serializer.validated_data
@@ -1264,6 +1275,81 @@ class CheezeePayUPIPayOut(APIView):
             response['httpstatus'] = status.HTTP_400_BAD_REQUEST
             return Response(response, status=response.get('httpstatus'))
 
+
+
+
+class BankingDetailsRequest(APIView):
+    # @check_user_permissions
+    def get(self, request):
+        response = {"status": "success", "errorcode": "", "reason": "", "result": "", "httpstatus": status.HTTP_200_OK}
+        try:
+            # ✅ Optional filtering by userid or pspName
+            userid = request.session_user
+            print('userid: ', userid)
+            pspName = request.query_params.get('pspName', None)
+
+            queryset = BankingDetails.objects.all().order_by('-id')
+
+            if userid:
+                queryset = queryset.filter(userid=userid)
+            if pspName:
+                queryset = queryset.filter(pspName=pspName)
+
+            # ✅ Serialize all matching records
+            serializer = BankingDetailsSerializer(queryset, many=True)
+
+            response["result"] = {
+                "records": serializer.data,
+                "totalRecords": queryset.count()
+            }
+
+            return Response(response, status=response.get('httpstatus'))
+
+        except Exception as e:
+            response["status"] = "error"
+            response["errorcode"] = status.HTTP_400_BAD_REQUEST
+            response["reason"] = str(e)
+            response["result"] = []
+            response["httpstatus"] = status.HTTP_400_BAD_REQUEST
+            return Response(response, status=response.get('httpstatus'))
+
+    # @check_user_permissions
+    def post(self, request):
+        response = {"status": "success", "errorcode": "", "reason": "", "result": "", "httpstatus": status.HTTP_200_OK}
+        try:
+            __data = request.data.get('data', {})
+            user_id = request.session_user  # assuming your session stores user id
+            __data["userid"] = user_id
+
+            # Set timestamps
+            __data["created_at"] = timezone.now()
+            __data["updated_at"] = timezone.now()
+
+            # Map wallet details for crypto payments
+            if __data.get("paymentMethod") == "crypto" and "bankDetails" in __data:
+                __data["walletAddress"] = __data["bankDetails"].get("walletAddress")
+                __data["paymentMethod"] = __data.get("paymentMethod")
+
+            print(__data)
+            serializer = BankingDetailsSerializer(data=__data)
+            if serializer.is_valid():
+                serializer.save()
+                response["result"] = "Banking details added successfully."
+            else:
+                response["status"] = "error"
+                response["errorcode"] = status.HTTP_400_BAD_REQUEST
+                response["reason"] = str(serializer.errors)
+                response["httpstatus"] = status.HTTP_400_BAD_REQUEST
+
+            return Response(response, status=response.get('httpstatus'))
+
+        except Exception as e:
+            response["status"] = "error"
+            response["errorcode"] = status.HTTP_400_BAD_REQUEST
+            response["reason"] = str(e)
+            response["result"] = []
+            response["httpstatus"] = status.HTTP_400_BAD_REQUEST
+            return Response(response, status=response.get('httpstatus'))
 
 #     def post(self, request):
 #         try:

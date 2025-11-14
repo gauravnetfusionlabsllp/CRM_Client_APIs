@@ -21,5 +21,9 @@ urlpatterns = [
    path('cheezeepay-upi-payin-webhook/', views.CheezeePayInCallBackWebhook.as_view(), name='cheezeepay-upi-payin-webhook'),
    path('jenapay-payin-webhook/', views.JenaPayPayInCallBack.as_view(), name="jenapay-payin-webhook"),
 
-   path('cheezeepay-upi-payout-webhook/', views.CheezeePayOutWebhook.as_view(), name="cheezeepay-upi-payin-webhook")
+   path('cheezeepay-upi-payout-webhook/', views.CheezeePayOutWebhook.as_view(), name="cheezeepay-upi-payin-webhook"),
+
+
+
+   path('banking-details/', views.BankingDetailsRequest.as_view(), name="banking-details")
 ]

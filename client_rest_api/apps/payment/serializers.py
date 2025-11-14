@@ -1,6 +1,7 @@
 # orders/serializers.py
 from rest_framework import serializers
 from .models import OrderDetails
+from apps.dashboard_admin.models  import BankingDetails
 
 class OrderDetailsSerializer(serializers.ModelSerializer):
     class Meta:
@@ -25,3 +26,9 @@ class WithdrawalApprovalActionSerializer(serializers.Serializer):
             raise serializers.ValidationError({"action": "Action must be true/false."})
 
         return attrs
+    
+
+class BankingDetailsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BankingDetails
+        fields = '__all__'
