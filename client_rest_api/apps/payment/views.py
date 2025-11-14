@@ -776,7 +776,7 @@ class JenaPayPayIn(APIView):
 
             # if userIdData:
 
-            amountWithFees = str(amountWithFees) + '.00'
+            amountWithFees = str(amountWithFees)
             order = {
                 "number": str(ordRec.orderId).replace('-',''),
                 "amount": str(amountWithFees),
