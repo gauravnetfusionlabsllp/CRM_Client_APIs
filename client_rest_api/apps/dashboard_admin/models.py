@@ -54,3 +54,18 @@ class WithdrawalApprovals(TimeStampModel):
         verbose_name = "Withdrawal Approvals"
         verbose_name_plural = "Withdrawal Approvals"
         db_table = "WithdrawalApprovals"
+
+
+
+class BankingDetails(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    created_at = models.DateTimeField()
+    updated_at = models.DateTimeField()
+    userid = models.CharField(db_column='userId', max_length=150, blank=True, null=True)
+    pspName = models.CharField(max_length=250, blank=True, null=True)
+    paymentMethod = models.CharField(max_length=250, blank=True, null=True)
+    bankDetails = models.JSONField(default=dict, blank=True, null=True)
+
+    class Meta:
+        managed = True  # Django should create the table
+        db_table = 'BankingDetails'  # use lowercase

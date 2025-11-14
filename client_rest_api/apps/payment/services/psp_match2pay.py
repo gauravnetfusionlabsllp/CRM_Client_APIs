@@ -6,8 +6,10 @@ import os, json
 from dotenv import load_dotenv
 MATCH2PAY_PAYIN_URL = os.environ.get('MATCH2PAY_PAYIN_URL')
 MATCH2PAY_PAYOUT_URL = os.environ.get('MATCH2PAY_PAYOUT_URL')
-MATCH2PAY_API_SECRETE = os.environ.get('MATCH2PAY_API_SECRETE')
-MATCH2PAY_PAY_API_TOKEN = os.environ.get('MATCH2PAY_PAY_API_TOKEN')
+MATCH2PAY_API_SECRETE_M = os.environ.get('MATCH2PAY_API_SECRETE_M')
+MATCH2PAY_API_SECRETE_S = os.environ.get('MATCH2PAY_API_SECRETE_S')
+MATCH2PAY_PAY_API_TOKEN_M = os.environ.get('MATCH2PAY_PAY_API_TOKEN_M')
+MATCH2PAY_PAY_API_TOKEN_S = os.environ.get('MATCH2PAY_PAY_API_TOKEN_S')
 MATCH2PAY_PAYOUT_CALLBACK_URL = os.environ.get('MATCH2PAY_PAYOUT_CALLBACK_URL')
 MATCH2PAY_FAILURE_URL = os.environ.get('MATCH2PAY_FAILURE_URL')
 MATCH2PAY_SUCCESS_URL = os.environ.get('MATCH2PAY_SUCCESS_URL')
@@ -38,6 +40,7 @@ class Match2PayPSP:
                 u.full_name, 
                 u.address, 
                 u.country_iso, 
+                u.registration_app,
                 u.city, 
                 u.state, 
                 u.zip, 
@@ -48,6 +51,14 @@ class Match2PayPSP:
             """
             __user_data = DBConnection._forFetchingJson(query, using='replica')
             __user_data = __user_data[0]
+            if __user_data.get('registration_app') == 2:
+                MATCH2PAY_PAY_API_TOKEN = MATCH2PAY_PAY_API_TOKEN_S
+                MATCH2PAY_API_SECRETE = MATCH2PAY_API_SECRETE_S
+            else:
+                MATCH2PAY_PAY_API_TOKEN = MATCH2PAY_PAY_API_TOKEN_M
+                MATCH2PAY_API_SECRETE = MATCH2PAY_API_SECRETE_M
+            print("MATCH2PAY_PAY_API_TOKEN with: ", MATCH2PAY_PAY_API_TOKEN)
+            print("MATCH2PAY_API_SECRETE with: ", MATCH2PAY_API_SECRETE)
             request_body = {
                 "amount": int(__data.amount),
                 "apiToken": MATCH2PAY_PAY_API_TOKEN,
