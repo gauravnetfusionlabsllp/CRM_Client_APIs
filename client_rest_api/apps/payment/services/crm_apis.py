@@ -48,7 +48,7 @@ class CRM:
         if data.get("pspName") == "match2pay":
             final_amount = int(amount * 100)
         else:
-            final_amount = int(usdAmount * 100)
+            final_amount = int(amount * 100)
 
         payload = {
             "brokerUserId": data.get("brokerUserId"),
@@ -75,7 +75,7 @@ class CRM:
             "blockedFromManualApproval": False
         }
 
-        print("Payload", payload)
+        print("Payload--------------------", payload)
 
         try:
             response = requests.post(str(CRM_MANUAL_WITHDRAWAL_URL), json=payload ,headers=headers)
