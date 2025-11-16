@@ -46,6 +46,8 @@ from django.utils import timezone
 from .utils.decorators import check_user_permissions
 from .services.crm_apis import CRM
 
+from apps.users.helpers.twilio_sending_message_helpers import send_text_message, verify_otp
+
 
 from apps.payment.constant.change_user_category_constant import check_and_update_user_category
 from apps.payment.services.psp_mat2pay_methods import payment_getway
@@ -328,6 +330,30 @@ class WithdrawalRequest(APIView):
         try:
             response = {"status": "success", "errorcode": "", "reason": "", "result":"", "httpstatus": status.HTTP_200_OK}
             __data = request.data.get('data')
+            withdrawalId  = request.data.get('withdrawalId')
+
+            if not withdrawalId:
+                response['status'] = "error"
+                response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                response['reason'] = "Withdrawal Id is required!!"
+            try:
+                withObj = WithdrawalApprovals.objects.get(id=int(withdrawalId))
+            except WithdrawalApprovals.DoesNotExist:
+                response = {
+                    'status': 'error',
+                    'errorcode': status.HTTP_400_BAD_REQUEST,
+                    'reason': "Such Transaction Doesn't Exist!!!",
+                    'httpstatus': status.HTTP_400_BAD_REQUEST
+                }
+                return Response(response, status=response['httpstatus'])
+            
+            if not withObj.otpVerified:
+                response['status'] = 'error'
+                response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                response['reason'] = "Withdrawal Request is not Verified !!"
+                response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                return Response(response, status=response.get('httpstatus'))
+
             user_id = request.session_user
             # user_id = __data.get('user_id')
             __data["userId"] = user_id
@@ -340,6 +366,8 @@ class WithdrawalRequest(APIView):
                     response['reason'] = str(crmRes["result"])
                     response['status'] = "error"
                     return Response(response, status=response.get('httpstatus'))
+                
+
                 else :
                     order_payload = {
                         "userId" :  user_id,
@@ -371,9 +399,8 @@ class WithdrawalRequest(APIView):
                     __data["walletAddress"] = __data.get("bankDetails").get('walletAddress')
                     __data["paymentMethod"] = __data.get("bankDetails").get('paymentGateway')
                     
-                    
-
-                serializer = WithdrawalApprovalSerializer(data=__data)
+                __data['full_name'] = "Test"
+                serializer = WithdrawalApprovalSerializer(withObj, data=__data, partial=True)
                 if serializer.is_valid():
                     serializer.save()
                 else:
@@ -1463,3 +1490,117 @@ class BankingDetailsRequest(APIView):
 #             response['reason'] = str(e)
 #             response['httpstatus'] = status.HTTP_400_BAD_REQUEST
 #             return Response(response, status=response.get('httpstatus'))
+
+
+class SendWithdrawalRequestOTP(APIView):
+
+    def post(self, request):
+        try:
+            response = {"status": "success", "errorcode": "", "result": "", "reason": "", "httpstatus": status.HTTP_200_OK}
+
+            data = request.data.get('data')
+            userId = request.session_user
+            query = f"""SELECT u.telephone_prefix, u.telephone FROM crmdb.users AS u where u.id = {int(userId)}"""
+
+            userData = DBConnection._forFetchingJson(query, using='replica')
+            if not userData:
+                response['status'] = 'error'
+                response['reason'] = 'User Record Does not Exist!!!'
+                response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                return Response(response, status=response.get('httpstatus'))
+
+            userData = userData[0]
+            formatNumber = str(userData.get('telephone_prefix'))+ str(userData.get('telephone'))
+
+            print(formatNumber, "-----------------------150")
+            res = send_text_message(formatNumber)
+
+            if res:
+                withdrawalObj = WithdrawalApprovals.objects.create(
+                    userId = data.get('user_id'),
+                    brokerUserId = data.get('brokerUserId'),
+                    email = data.get('email'),
+                    amount = data.get('amount'),
+                    walletAddress = data.get('walletAddress'),
+                    currency = data.get('currency'),
+                    pspName = data.get('pspName'),
+                    bankDetails = data.get('bankDetails')
+                )
+                withdrawalObj.save()
+
+                response['reason'] = 'OTP Send Successfully!!!'
+                response['result'] = {
+                    "withdrawalId" : withdrawalObj.id
+                }
+                return Response(response, status=response.get('httpstatus'))
+
+            response['status'] = 'error'
+            response['errorcode'] = status.HTTP_400_BAD_REQUEST
+            response['reason'] = "Failed to send OTP!!!"
+            response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+            return Response(response, status=response.get('httpstatus'))
+
+        except Exception as e:
+            print(f"Error in the Sending the withdrawal request OTP: {str(e)}")
+            response['status'] = 'error'
+            response['errorcode'] = status.HTTP_400_BAD_REQUEST
+            response['reason'] = str(e)
+            response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+            return Response(response, status=response.get('httpstatus'))
+        
+
+class VerifyWithdrawalOTP(APIView):
+
+    def post(self, request):
+        try:
+            response = {"status":"success", "errorcode": "", "reason": "", "result": "", "httpstatus": status.HTTP_200_OK}
+
+            data = request.data.get('data')
+            phoneNo = data.get('phoneNo')
+            otp = data.get('otp')
+            withdrawalId = int(data.get('withdrawalId'))
+
+            if not all([phoneNo, otp, withdrawalId]):
+                response['status'] = 'error'
+                response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                response['reason'] = 'Phone No, OTP and Withdrawal Id are required!!'
+                response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                return Response(response, status=response.get('httpstatus'))
+            
+            try:
+                withObj = WithdrawalApprovals.objects.get(id=withdrawalId)
+            except WithdrawalApprovals.DoesNotExist:
+                response = {
+                    'status': 'error',
+                    'errorcode': status.HTTP_400_BAD_REQUEST,
+                    'reason': "Such Transaction Doesn't Exist!!!",
+                    'httpstatus': status.HTTP_400_BAD_REQUEST
+                }
+                return Response(response, status=response['httpstatus'])
+            
+
+            res = verify_otp(phoneNo, otp)
+            if res:
+                if not withObj.otpVerified:
+                    withObj.otpVerified = True
+                    withObj.save()
+                    response['reason'] = "OTP Verified Successfully!!!!"
+                    return Response(response, status=response.get('httpstatus'))
+                
+                response['reason'] = "Withdrawal Order Already Verified!!"
+                return Response(response, status=response.get('httpstatus'))
+            
+            response['status'] = 'error'
+            response['errorcode'] = status.HTTP_400_BAD_REQUEST
+            response['reason'] = "Invalid OTP!!!!"
+            response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+            return Response(response, status=response.get('httpstatus'))
+
+        except Exception as e:
+            print(f"Error in verifing in the Withdrawal OTP : {str(e)}")
+            response['status'] = 'error'
+            response['errorcode'] = status.HTTP_400_BAD_REQUEST
+            response['reason'] = str(e)
+            response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+            return Response(response, status=response.get('httpstatus'))

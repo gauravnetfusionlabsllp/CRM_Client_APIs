@@ -14,6 +14,9 @@ pytesseract.pytesseract.tesseract_cmd = TESSERACT
 
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+TESSERACT = os.getenv("TESSERACT")
+
+pytesseract.pytesseract.tesseract_cmd =  TESSERACT
 if not OPENAI_API_KEY:
     raise RuntimeError("Set OPENAI_API_KEY in environment or .env file")
 
