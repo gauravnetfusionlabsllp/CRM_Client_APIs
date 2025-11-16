@@ -10,10 +10,12 @@ from openai import OpenAI
 # -------------------------------------------------------------
 # Configuration
 # -------------------------------------------------------------
-# pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+TESSERACT = os.getenv("TESSERACT")
+
+pytesseract.pytesseract.tesseract_cmd =  r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 if not OPENAI_API_KEY:
     raise RuntimeError("Set OPENAI_API_KEY in environment or .env file")
 

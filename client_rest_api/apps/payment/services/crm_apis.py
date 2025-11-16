@@ -67,11 +67,11 @@ class CRM:
             "bankSwiftCode": "NA",
             "caseOrigin": "NA",
             "withdrawalPurpose": "Personal funds withdrawal",
-            "accountHolderName": userData.get("full_name"),
+            "accountHolderName": userData.get("full_name", "test"),
             "bankCountry": "NA",
             "paymentCurrency": "USD",
             "registeredEmail": userData.get("email"),
-            "registeredName": userData.get("full_name"),
+            "registeredName": userData.get("full_name","test"),
             "blockedFromManualApproval": False
         }
 

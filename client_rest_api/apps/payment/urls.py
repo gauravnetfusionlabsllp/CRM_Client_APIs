@@ -25,5 +25,11 @@ urlpatterns = [
 
 
 
-   path('banking-details/', views.BankingDetailsRequest.as_view(), name="banking-details")
+   path('banking-details/', views.BankingDetailsRequest.as_view(), name="banking-details"),
+
+
+   # -------------------------------Withdrawal OTP Verification ----------------------------
+
+   path('withdrawal-request-otp/', views.SendWithdrawalRequestOTP.as_view(), name="Send-Withdrawal-RequestOTP"),
+   path('verify-withdrawal-otp/', views.VerifyWithdrawalOTP.as_view(), name="Verify-Withdrawal-OTP"),
 ]

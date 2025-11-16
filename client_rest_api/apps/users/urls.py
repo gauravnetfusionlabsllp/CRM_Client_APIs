@@ -9,4 +9,5 @@ urlpatterns = [
    path('get-wp-verify-link/', views.GenerateWPLink.as_view(), name="get-wp-verify-link"),
    path('phone-send-otp/', views.CheckUserPhoneNumber.as_view(), name="verify-user-phone-number"),
    path('verify-phone-otp/', views.VerifyUserPhoneNumber.as_view(), name="verify-phone-otp"),
+   
 ]

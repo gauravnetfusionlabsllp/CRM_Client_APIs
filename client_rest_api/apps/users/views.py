@@ -30,7 +30,6 @@ class CheckUserPhoneNumber(APIView):
     def get(self, request):
         try:
             response = {"status": "success", "errorcode": "", "reason":"", "result": "", "httpstatus": status.HTTP_200_OK}
-
             phoneNo = request.query_params.get('ph')
             print(phoneNo,"------------------test")
 
@@ -317,3 +316,6 @@ class GenerateWPLink(APIView):
             response["reason"] = str(e)
             response["httpstatus"] = HTTP_400_BAD_REQUEST
             return JsonResponse(response, status=response['httpstatus'])
+        
+
+
