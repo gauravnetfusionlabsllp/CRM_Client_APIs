@@ -5,12 +5,14 @@ from dotenv import load_dotenv
 from pydantic import BaseModel
 from typing import Optional
 from openai import OpenAI
+import pdf2image
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 TESSERACT = os.environ.get('TESSERACT')
 # -------------------------------------------------------------
 # Configuration
 # -------------------------------------------------------------
-pytesseract.pytesseract.tesseract_cmd = TESSERACT
+# pytesseract.pytesseract.tesseract_cmd = TESSERACT  # not required already in PATH
 
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -55,9 +57,13 @@ class IDCardDetails(BaseModel):
 # -------------------------------------------------------------
 # OCR Step
 # -------------------------------------------------------------
-def ocr_image(path: str) -> str:
+def ocr_image(input_obj: str) -> str:
     """Extract text from image using Tesseract OCR"""
-    img = Image.open(path)
+    if isinstance(input_obj, str):
+        img = Image.open(input_obj)
+    else:
+        img = input_obj  # already a PIL image
+    
     text = pytesseract.image_to_string(img, lang="eng")
     return text
 
@@ -130,8 +136,39 @@ OCR TEXT:
 def extract_from_image(image_path: str, doc_hint: str = "") -> dict:
     """Extract document info from any image or scanned document"""
     print(f"[+] Processing: {image_path}")
-    ocr_text = ocr_image(image_path)
+    ext = os.path.splitext(image_path)[1].lower()  
 
+    print("Extension:", ext)
+
+    if ext == ".pdf":
+        print("Pricessing")
+        images = pdf2image.convert_from_path(image_path)
+        print(images)
+    else:
+        images = [image_path]
+
+    # ocr_text = ""
+    # for pg, img in enumerate(images):
+    #     ocr_text += ocr_image(img) + "\n\n"
+
+    ocr_results = [""] * len(images)
+
+    def run_ocr(i_img):
+        idx, img = i_img
+        return idx, ocr_image(img)
+
+    if len(images) > 1:
+        max_workers = min(len(images), 6)
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [executor.submit(run_ocr, (i, img)) for i, img in enumerate(images)]
+            for f in as_completed(futures):
+                idx, text = f.result()
+                ocr_results[idx] = text
+    else:
+        ocr_results[0] = ocr_image(images[0])
+
+    ocr_text = "\n\n".join(ocr_results)
+    
     print("\n----- OCR TEXT (first 500 chars) -----")
     print(ocr_text[:500])
     print("--------------------------------------\n")
