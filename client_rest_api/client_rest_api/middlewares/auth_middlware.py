@@ -11,7 +11,8 @@ class AuthTokenMiddleware(MiddlewareMixin):
             '/payment/match2pay-pay-out-webhook/',
             '/payment/match2pay-pay-in-webhook/',
             '/payment/cheezeepay-upi-payout-webhook/',
-            '/payment/cheezeepay-upi-payin-webhook/'
+            '/payment/cheezeepay-upi-payin-webhook/',
+            '/payment/jenapay-payin-webhook/'
         ]
 
     def process_request(self, request):
@@ -54,7 +55,7 @@ class GettingUnseriInfoMiddleware(MiddlewareMixin):
 
     def process_request(self, request):
 
-        if not any(request.path.startswith(url) for url in self.target_urls):
+        if not any(request.path.endswith(url) for url in self.target_urls):
             return None
         
         if not request.headers.get("Auth-Token"):
