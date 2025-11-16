@@ -6,16 +6,17 @@ from pydantic import BaseModel
 from typing import Optional
 from openai import OpenAI
 
-
+TESSERACT = os.environ.get('TESSERACT')
 # -------------------------------------------------------------
 # Configuration
 # -------------------------------------------------------------
+pytesseract.pytesseract.tesseract_cmd = TESSERACT
 
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 TESSERACT = os.getenv("TESSERACT")
 
-pytesseract.pytesseract.tesseract_cmd =  r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+pytesseract.pytesseract.tesseract_cmd =  TESSERACT
 if not OPENAI_API_KEY:
     raise RuntimeError("Set OPENAI_API_KEY in environment or .env file")
 
