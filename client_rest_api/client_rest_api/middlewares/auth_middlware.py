@@ -51,7 +51,7 @@ class GettingUnseriInfoMiddleware(MiddlewareMixin):
 
     def __init__(self, get_response=None):
         super().__init__(get_response)
-        self.target_urls = ['/payment/match2pay-pay-in']
+        self.target_urls = ['/payment/match2pay-pay-in/']
 
     def process_request(self, request):
 
