@@ -910,51 +910,65 @@ class JenaPayPayInCallBack(APIView):
             response = {"status": "success", "errorcode": "", "reason": "", "result": "", "httpstatus": status.HTTP_200_OK}
             
             data = request.data
+            print(data,"-------------------150")
             order_number = data.get("order_number")
-            order_amount = data.get("order_amount")[0]
-            order_currency = data.get("order_currency")[0]
-            order_description = data.get("order_description")[0]
-            order_hash = data.get("hash")[0]
-            order_status = data.get("status")[0]
-            order_date = data.get("date")[0]
+            order_amount = data.get("order_amount")
+            order_currency = data.get("order_currency")
+            order_description = data.get("order_description")
+            order_hash = data.get("hash")
+            order_status = data.get("status")
+            order_date = data.get("date")
             order_tranactionId = data.get("arn")
- 
+            print(order_number, order_amount, order_currency, order_description, order_hash, order_status, order_tranactionId)
+            
             orderId = str(uuid.UUID(order_number))
             orderData = (
                     OrderDetails.objects
                     .get(orderId=orderId)
                 )
-            print(orderData, "---------------")
+
+            if order_status != "success":
+                orderData.status = "FAILED"
+                orderData.save()
+                return Response({"code": "200", "msg": "payment failed"}, status=200)
+
+
+            if not order_tranactionId:
+                return Response({"code": "200", "msg": "missing transaction id"}, status=200)
+
 
             if orderData.status == "SUCCESS":
-                return Response({"code": "200", "msg": "Already processed"}, status=status.HTTP_200_OK)
+                return Response({"code": "200", "msg": "already processed"}, status=200)
+
+
+            if orderData.status != "SUCCESS":
+                print("--------------------255")
+                payload = {
+                    "brokerBankingId": orderData.brokerBankingId,
+                    "method" : 19,
+                    "comment": "Deposit for Trading Account Approved",
+                    "pspTransactionId" : str(order_number),
+                    "decisionTime" : int(datetime.now().timestamp() * 1000)
+                }
+
+                header = {
+                    "Content-Type": "application/json",
+                    "x-crm-api-token": str(CRM_AUTH_TOKEN)
+                }
+
+                crmRes = requests.post(str(CRM_MANUAL_DEPOSIT_APPROVE_URL), json=payload, headers=header).json()
+
+                print(crmRes,"--------------------")
+
+                if crmRes.get('success'):
+                    orderData.status = "SUCCESS"
+                    orderData.transactionId = str(order_tranactionId)
+                    orderData.tradingId = str(crmRes['result']['brokerUserExternalId'])
+                    orderData.save()
+                    print("SUCCESS ---------------------------")
+                    return Response({"code": "200", "msg": "success"}, status=status.HTTP_200_OK)
             
-            payload = {
-                "brokerBankingId": orderData.brokerBankingId,
-                "method" : 19,
-                "comment": "Deposit for Trading Account Approved",
-                "pspTransactionId" : str(order_number),
-                "decisionTime" : int(datetime.now().timestamp() * 1000)
-            }
-
-            header = {
-                "Content-Type": "application/json",
-                "x-crm-api-token": str(CRM_AUTH_TOKEN)
-            }
-
-            crmRes = requests.post(str(CRM_MANUAL_DEPOSIT_APPROVE_URL), json=payload, headers=header).json()
-
-            print(crmRes,"--------------------")
-
-            if crmRes.get('success'):
-                orderData.status = "SUCCESS"
-                orderData.transactionId = str(order_tranactionId)
-                orderData.tradingId = str(crmRes['result']['brokerUserExternalId'])
-                orderData.save()
-                print("SUCCESS ---------------------------")
-                return Response({"code": "200", "msg": "success"}, status=status.HTTP_200_OK)
-            
-            return Response({"code": "200", "msg": "success"}, status=status.HTTP_200_OK)
+            return Response({"code": "400", "msg": "failed"}, status=status.HTTP_200_OK)
 
         except Exception as e:
             print(f"Error in PayIn Webhook: {str(e)}")
