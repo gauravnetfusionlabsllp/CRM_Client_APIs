@@ -869,10 +869,10 @@ class JenaPayPayIn(APIView):
                 "method": 19,
                 "comment": "Deposit for Trading Account",
                 "commentForUser": "Deposit for Trading Account",
-                "pspId": 12,
+                "pspId": 15,
                 "pspTransactionId": order.get('number'),
                 "status": "Pending",
-                "normalizedAmount": int(float(amount)),
+                "normalizedAmount": int(float(amount))*100,
                 "decisionTime": 0,
                 "declineReason": "string",
                 "brandExternalId": order.get('number')
@@ -956,8 +956,6 @@ class JenaPayPayInCallBack(APIView):
                     orderData.save()
                     print("SUCCESS ---------------------------")
                     return Response({"code": "200", "msg": "success"}, status=status.HTTP_200_OK)
-            
-            return Response({"code": "400", "msg": "failed"}, status=status.HTTP_200_OK)
 
         except Exception as e:
             print(f"Error in PayIn Webhook: {str(e)}")
