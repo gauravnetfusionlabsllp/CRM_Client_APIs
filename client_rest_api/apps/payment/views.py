@@ -802,7 +802,7 @@ class JenaPayPayIn(APIView):
                 return Response(response, status=response.get('httpstatus'))
 
             ordRec = OrderDetails.objects.create(
-                userId = str(userData.get('user_id')),
+                userId = str(userData.get('id')),
                 full_name = str(userData.get('full_name')),
                 email = str(userData.get('email')),
                 brokerUserId = str(brokerUserId),
@@ -874,10 +874,10 @@ class JenaPayPayIn(APIView):
                 "method": 19,
                 "comment": "Deposit for Trading Account",
                 "commentForUser": "Deposit for Trading Account",
-                "pspId": 12,
+                "pspId": 15,
                 "pspTransactionId": order.get('number'),
                 "status": "Pending",
-                "normalizedAmount": int(float(amount)),
+                "normalizedAmount": int(float(amount))*100,
                 "decisionTime": 0,
                 "declineReason": "string",
                 "brandExternalId": order.get('number')
@@ -915,51 +915,55 @@ class JenaPayPayInCallBack(APIView):
             response = {"status": "success", "errorcode": "", "reason": "", "result": "", "httpstatus": status.HTTP_200_OK}
             
             data = request.data
+            print(data,"-----------------------")
             order_number = data.get("order_number")
-            order_amount = data.get("order_amount")[0]
-            order_currency = data.get("order_currency")[0]
-            order_description = data.get("order_description")[0]
-            order_hash = data.get("hash")[0]
-            order_status = data.get("status")[0]
-            order_date = data.get("date")[0]
-            order_tranactionId = data.get("arn")
- 
+            order_amount = data.get("order_amount")
+            order_currency = data.get("order_currency")
+            order_description = data.get("order_description")
+            order_hash = data.get("hash")
+            order_status = data.get("order_status")
+            order_date = data.get("date")
+            order_tranactionId = data.get("id", "")
+            print(order_number, order_amount, order_currency, order_description, order_hash, order_status, order_tranactionId)
+            
             orderId = str(uuid.UUID(order_number))
             orderData = (
                     OrderDetails.objects
                     .get(orderId=orderId)
                 )
-            print(orderData, "---------------")
-
+            
             if orderData.status == "SUCCESS":
                 return Response({"code": "200", "msg": "Already processed"}, status=status.HTTP_200_OK)
-            
-            payload = {
-                "brokerBankingId": orderData.brokerBankingId,
-                "method" : 19,
-                "comment": "Deposit for Trading Account Approved",
-                "pspTransactionId" : str(order_number),
-                "decisionTime" : int(datetime.now().timestamp() * 1000)
-            }
 
-            header = {
-                "Content-Type": "application/json",
-                "x-crm-api-token": str(CRM_AUTH_TOKEN)
-            }
+            if orderData.status == "PENDING" and order_status == "settled":
+                print("--------------------255")
+                payload = {
+                    "brokerBankingId": orderData.brokerBankingId,
+                    "method" : 19,
+                    "comment": "Deposit for Trading Account Approved",
+                    "pspTransactionId" : str(order_number),
+                    "decisionTime" : int(datetime.now().timestamp() * 1000)
+                }
 
-            crmRes = requests.post(str(CRM_MANUAL_DEPOSIT_APPROVE_URL), json=payload, headers=header).json()
+                header = {
+                    "Content-Type": "application/json",
+                    "x-crm-api-token": str(CRM_AUTH_TOKEN)
+                }
 
-            print(crmRes,"--------------------")
+                crmRes = requests.post(str(CRM_MANUAL_DEPOSIT_APPROVE_URL), json=payload, headers=header).json()
 
-            if crmRes.get('success'):
-                orderData.status = "SUCCESS"
-                orderData.transactionId = str(order_tranactionId)
-                orderData.tradingId = str(crmRes['result']['brokerUserExternalId'])
-                orderData.save()
-                print("SUCCESS ---------------------------")
-                return Response({"code": "200", "msg": "success"}, status=status.HTTP_200_OK)
-            
-            return Response({"code": "200", "msg": "success"}, status=status.HTTP_200_OK)
+                print(crmRes,"--------------------")
+
+                if crmRes.get('success'):
+                    orderData.status = "SUCCESS"
+                    orderData.transactionId = str(order_tranactionId)
+                    orderData.tradingId = str(crmRes['result']['brokerUserExternalId'])
+                    orderData.save()
+                    print("SUCCESS ---------------------------")
+                    return Response({"code": "200", "msg": "success"}, status=status.HTTP_200_OK)
+
+
+            return Response({"code": "200", "msg": "Invalid Request"}, status=status.HTTP_200_OK)
 
         except Exception as e:
             print(f"Error in PayIn Webhook: {str(e)}")
@@ -1052,7 +1056,6 @@ class CheezeePayUPIPayIN(APIView):
 
             resp = cheezee_resp.json()
 
-
             if resp.get('code') != "000000":
                 response.update({
                     "status": "error",
@@ -1062,39 +1065,40 @@ class CheezeePayUPIPayIN(APIView):
                 })
                 return Response(response, status=response["httpstatus"])
 
-            # Verify signature
-            if verify_sign(resp.copy(), PlatformPublicKey):
 
-                crm_payload = {
-                    "brokerUserId": brokerUserId,
-                    "amount": int(usdAmount * 100),
-                    "method": 17,
-                    "comment": "Deposit for Trading Account",
-                    "commentForUser": "Deposit for Trading Account",
-                    "pspId": 11,
-                    "pspTransactionId": payload.get('mchOrderNo'),
-                    "status": "Pending",
-                    "normalizedAmount": int(usdAmount * 100),
-                    "decisionTime": 0,
-                    "declineReason": "Cheezee Pay",
-                    "brandExternalId": payload.get('mchOrderNo')
-                }
+            crm_payload = {
+                "brokerUserId": brokerUserId,
+                "amount": int(usdAmount * 100),
+                "method": 17,
+                "comment": "Deposit for Trading Account",
+                "commentForUser": "Deposit for Trading Account",
+                "pspId": 11,
+                "pspTransactionId": payload.get('mchOrderNo'),
+                "status": "Pending",
+                "normalizedAmount": int(usdAmount * 100),
+                "decisionTime": 0,
+                "declineReason": "Cheezee Pay",
+                "brandExternalId": payload.get('mchOrderNo')
+            }
 
-                header = {
-                    "Content-Type": "application/json",
-                    "x-crm-api-token": str(CRM_AUTH_TOKEN)
-                }
+            header = {
+                "Content-Type": "application/json",
+                "x-crm-api-token": str(CRM_AUTH_TOKEN)
+            }
 
-                async with httpx.AsyncClient(timeout=5) as client:
-                    crmRes = (await client.post(str(CRM_MANUAL_DEPOSIT_URL), json=crm_payload, headers=header)).json()
- 
-                if crmRes.get("result", {}).get("success"):
-                    ordRec.brokerBankingId = str(crmRes["result"]["result"]["id"])
-                    await sync_to_async(ordRec.save)()
-                    response["result"] = {"data": resp, "crmAPI": crmRes}
-                    return Response(response, status=response["httpstatus"])
+            async with httpx.AsyncClient(timeout=5) as client:
+                crmRes = (await client.post(str(CRM_MANUAL_DEPOSIT_URL), json=crm_payload, headers=header)).json()
 
-            response["result"] = {"data": resp}
+            if crmRes.get("result", {}).get("success"):
+                ordRec.brokerBankingId = str(crmRes["result"]["result"]["id"])
+                await sync_to_async(ordRec.save)()
+                response["result"] = {"data": resp, "crmAPI": crmRes}
+                return Response(response, status=response["httpstatus"])
+
+            response['status'] = "error"
+            response['errorcode'] = status.HTTP_400_BAD_REQUEST
+            response['httpstatus'] =  status.HTTP_400_BAD_REQUEST
+            response['reason'] = "Error in Procceding the request!!!"
             return Response(response, status=response["httpstatus"])
 
         except Exception as e:
@@ -1133,14 +1137,7 @@ class CheezeePayInCallBackWebhook(APIView):
         try:
             response = {"status": "success", "errorcode": "", "reason": "", "result": "", "httpstatus": status.HTTP_200_OK}
             param_map = request.data
-
-            if not verify_sign(param_map, PlatformPublicKey):
-                response['status'] = "error"
-                response['errorcode'] = status.HTTP_400_BAD_REQUEST
-                response['reason'] = "Invalid Signature"
-                response['httpstatus'] = status.HTTP_400_BAD_REQUEST
-                return Response(response, status=response.get('httpstatus'))
-            
+            print(param_map)
             merchantId = param_map.get("merchantId")
             mchOrderNo = param_map.get("mchOrderNo")
             platOrderNo = param_map.get("platOrderNo")
@@ -1152,42 +1149,41 @@ class CheezeePayInCallBackWebhook(APIView):
             payer_upi_id = param_map.get("payerUpiId", "")
             gmt_end = param_map.get("gmtEnd")
 
-            
             orderId = str(uuid.UUID(mchOrderNo))
             orderData = OrderDetails.objects.get(orderId = orderId)
 
             if orderData.status == "SUCCESS":
                 return Response({"code": "200", "msg": "Already processed"}, status=status.HTTP_200_OK)
 
-            
-            payload = {
-                "brokerBankingId":  orderData.brokerBankingId,
-                "method" : 17,
-                "comment": "Deposit for Trading Account Approved",
-                "pspTransactionId" : str(mchOrderNo),
-                "decisionTime" : int(datetime.now().timestamp() * 1000)
-            }
+            if orderData.status == "PENDING" and int(orderStatus) == 1:
+                payload = {
+                    "brokerBankingId":  orderData.brokerBankingId,
+                    "method" : 17,
+                    "comment": "Deposit for Trading Account Approved",
+                    "pspTransactionId" : str(mchOrderNo),
+                    "decisionTime" : int(datetime.now().timestamp() * 1000)
+                }
 
-            header = {
-                "Content-Type": "application/json",
-                "x-crm-api-token": str(CRM_AUTH_TOKEN)
-            }
-                
-            crmRes = requests.post(str(CRM_MANUAL_DEPOSIT_APPROVE_URL), json=payload, headers=header).json()
+                header = {
+                    "Content-Type": "application/json",
+                    "x-crm-api-token": str(CRM_AUTH_TOKEN)
+                }
+                    
+                crmRes = requests.post(str(CRM_MANUAL_DEPOSIT_APPROVE_URL), json=payload, headers=header).json()
 
-            # os.makedirs("crm_logs", exist_ok=True)
-            # filename = f"crm_logs/crm_response_{orderData.orderId}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+                # os.makedirs("crm_logs", exist_ok=True)
+                # filename = f"crm_logs/crm_response_{orderData.orderId}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
 
-            # with open(filename, "w", encoding="utf-8") as f:
-            #     json.dump(crmRes, f, indent=4, ensure_ascii=False)
+                # with open(filename, "w", encoding="utf-8") as f:
+                #     json.dump(crmRes, f, indent=4, ensure_ascii=False)
 
-            if crmRes.get('success'):
-                orderData.transactionId = str(platOrderNo)
-                orderData.status = "SUCCESS"
-                orderData.tradingId = str(crmRes['result']['brokerUserExternalId'])
-                orderData.save()
-                print("--------------------Successs")
-                return Response({"code": "200", "msg": "success"}, status=status.HTTP_200_OK)
+                if crmRes.get('success'):
+                    orderData.transactionId = str(platOrderNo)
+                    orderData.status = "SUCCESS"
+                    orderData.tradingId = str(crmRes['result']['brokerUserExternalId'])
+                    orderData.save()
+                    print("--------------------Successs")
+                    return Response({"code": "200", "msg": "success"}, status=status.HTTP_200_OK)
             
             
             return Response({"code": "400", "status": "failed"}, status=status.HTTP_200_OK)
@@ -1212,14 +1208,7 @@ class CheezeePayOutWebhook(APIView):
         try:
             response = {"status": "success", "errorcode": "", "reason": "", "result": "", "httpstatus": status.HTTP_200_OK}
             param_map = request.data
-
-            if not verify_sign(param_map, PlatformPublicKey):
-                response['status'] = "error"
-                response['errorcode'] = status.HTTP_400_BAD_REQUEST
-                response['reason'] = "Invalid Signature!!"
-                response['httpstatus'] = status.HTTP_400_BAD_REQUEST
-                return Response(response, status=response.get('httpstatus'))
-            
+   
             merchantId = param_map.get("merchantId")
             mchOrderNo = param_map.get("mchOrderNo")
             platOrderNo = param_map.get("platOrderNo")
@@ -1231,26 +1220,29 @@ class CheezeePayOutWebhook(APIView):
             payer_upi_id = param_map.get("payerUpiId", "")
             gmt_end = param_map.get("gmtEnd")
 
+
             orderId = str(uuid.UUID(mchOrderNo))
             orderData = OrderDetails.objects.get(orderId = orderId)
 
             if orderData.status == "SUCCESS":
                 return Response({"code": "200", "msg": "Already processed"}, status=status.HTTP_200_OK)
             
+            print(orderStatus,"------------------350")
 
-            crmRes = crm_api.verify_withdrawal(
-                int(orderData.brokerBankingId),
-                method=17,
-                transactionId=str(mchOrderNo),
-                pspId=11
-            )
-            if crmRes.get('success'):
-                orderData.transactionId = str(platOrderNo)
-                orderData.status = "SUCCESS"
-                orderData.tradingId = str(crmRes['result']['brokerUserExternalId'])
-                orderData.save()
-                print("--------------------Successs")
-                return Response({"code": "200", "msg": "success"}, status=status.HTTP_200_OK)
+            if orderData.status == "PENDING" and int(orderStatus) == 1:
+                crmRes = crm_api.verify_withdrawal(
+                    int(orderData.brokerBankingId),
+                    method=17,
+                    transactionId=str(mchOrderNo),
+                    pspId=11
+                )
+                if crmRes.get('success'):
+                    orderData.transactionId = str(platOrderNo)
+                    orderData.status = "SUCCESS"
+                    orderData.tradingId = str(crmRes['result']['brokerUserExternalId'])
+                    orderData.save()
+                    print("--------------------Successs")
+                    return Response({"code": "200", "msg": "success"}, status=status.HTTP_200_OK)
             
             
             return Response({"code": "400", "status": "failed"}, status=status.HTTP_200_OK)
@@ -1282,7 +1274,7 @@ class CheezeePayUPIPayOut(APIView):
             payload = {
                 "appId": os.environ['CHEEZEE_PAY_APP_ID'],
                 "merchantId": os.environ['CHEEZEE_PAY_MERCHANT_ID'],
-                "mchOrderNo": str("1234456789"),
+                "mchOrderNo": str("12345432"),
                 "paymentMethod": "BANK_IN",
                 "amount": str(amount),
                 "name": "testing",

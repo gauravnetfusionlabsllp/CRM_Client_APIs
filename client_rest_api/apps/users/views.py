@@ -222,6 +222,7 @@ class CheckEmail(APIView):
                 else:
                     response['httpstatus'] = HTTP_200_OK
                     response['status'] = "success"
+                    response['result'] = "Email Does not Exist!!!"
             
             return JsonResponse(response, status=response['httpstatus'])
         except Exception as e:

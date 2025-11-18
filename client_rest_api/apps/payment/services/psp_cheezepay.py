@@ -60,7 +60,7 @@ class CheezePayPSP:
                 "appId": os.environ['CHEEZEE_PAY_APP_ID'],
                 "merchantId": os.environ['CHEEZEE_PAY_MERCHANT_ID'],
                 "mchOrderNo": str(data.ordertransactionid.orderId).replace("-",""),
-                "paymentMethod": "BANK_IN",
+                "paymentMethod": "P2P_BANK_IN",
                 "amount": str(amount),
                 "name": __user_data.get('full_name'),
                 "email": __user_data.get('email'),
@@ -76,9 +76,8 @@ class CheezePayPSP:
             print(resp,"---------------------------250")
             # return resp
             if resp.get("code") == "000000":
-                if verify_sign(resp, PlatformPublicKey):
-                    print(resp,"-------------------------------150")
-                    return resp
+                print(resp,"-------------------------------150")
+                return resp
         
         except Exception as e:
             print(f"Error in the CheezeePay PayOut Order: {str(e)}")

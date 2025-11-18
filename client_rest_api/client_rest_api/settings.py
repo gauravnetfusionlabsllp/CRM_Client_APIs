@@ -51,7 +51,8 @@ CORS_ALLOW_HEADERS = [
     'activeId',
     'user_id',   
     'auth-token',  
-    'Auth_token' 
+    'Auth_token',
+    'userselectedregistrationappid'
 ]
 
 
