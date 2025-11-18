@@ -797,7 +797,7 @@ class JenaPayPayIn(APIView):
                 return Response(response, status=response.get('httpstatus'))
 
             ordRec = OrderDetails.objects.create(
-                userId = str(userData.get('user_id')),
+                userId = str(userData.get('id')),
                 full_name = str(userData.get('full_name')),
                 email = str(userData.get('email')),
                 brokerUserId = str(brokerUserId),
@@ -916,9 +916,9 @@ class JenaPayPayInCallBack(APIView):
             order_currency = data.get("order_currency")
             order_description = data.get("order_description")
             order_hash = data.get("hash")
-            order_status = data.get("status")
+            order_status = data.get("order_status")
             order_date = data.get("date")
-            order_tranactionId = data.get("arn")
+            order_tranactionId = data.get("id", "")
             print(order_number, order_amount, order_currency, order_description, order_hash, order_status, order_tranactionId)
             
             orderId = str(uuid.UUID(order_number))
@@ -926,8 +926,11 @@ class JenaPayPayInCallBack(APIView):
                     OrderDetails.objects
                     .get(orderId=orderId)
                 )
+            
+            if orderData.status == "SUCCESS":
+                return Response({"code": "200", "msg": "Already processed"}, status=status.HTTP_200_OK)
 
-            if orderData.status == "PENDING" and order_status == "success":
+            if orderData.status == "PENDING" and order_status == "settled":
                 print("--------------------255")
                 payload = {
                     "brokerBankingId": orderData.brokerBankingId,
@@ -954,7 +957,7 @@ class JenaPayPayInCallBack(APIView):
                     print("SUCCESS ---------------------------")
                     return Response({"code": "200", "msg": "success"}, status=status.HTTP_200_OK)
             
-            return Response({"code": "200", "msg": "success"}, status=status.HTTP_200_OK)
+            return Response({"code": "400", "msg": "failed"}, status=status.HTTP_200_OK)
 
         except Exception as e:
             print(f"Error in PayIn Webhook: {str(e)}")
@@ -1147,42 +1150,41 @@ class CheezeePayInCallBackWebhook(APIView):
             payer_upi_id = param_map.get("payerUpiId", "")
             gmt_end = param_map.get("gmtEnd")
 
-            
             orderId = str(uuid.UUID(mchOrderNo))
             orderData = OrderDetails.objects.get(orderId = orderId)
 
             if orderData.status == "SUCCESS":
                 return Response({"code": "200", "msg": "Already processed"}, status=status.HTTP_200_OK)
 
-            
-            payload = {
-                "brokerBankingId":  orderData.brokerBankingId,
-                "method" : 17,
-                "comment": "Deposit for Trading Account Approved",
-                "pspTransactionId" : str(mchOrderNo),
-                "decisionTime" : int(datetime.now().timestamp() * 1000)
-            }
+            if orderData.status == "PENDING" and int(orderStatus) == 1:
+                payload = {
+                    "brokerBankingId":  orderData.brokerBankingId,
+                    "method" : 17,
+                    "comment": "Deposit for Trading Account Approved",
+                    "pspTransactionId" : str(mchOrderNo),
+                    "decisionTime" : int(datetime.now().timestamp() * 1000)
+                }
 
-            header = {
-                "Content-Type": "application/json",
-                "x-crm-api-token": str(CRM_AUTH_TOKEN)
-            }
-                
-            crmRes = requests.post(str(CRM_MANUAL_DEPOSIT_APPROVE_URL), json=payload, headers=header).json()
+                header = {
+                    "Content-Type": "application/json",
+                    "x-crm-api-token": str(CRM_AUTH_TOKEN)
+                }
+                    
+                crmRes = requests.post(str(CRM_MANUAL_DEPOSIT_APPROVE_URL), json=payload, headers=header).json()
 
-            # os.makedirs("crm_logs", exist_ok=True)
-            # filename = f"crm_logs/crm_response_{orderData.orderId}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+                # os.makedirs("crm_logs", exist_ok=True)
+                # filename = f"crm_logs/crm_response_{orderData.orderId}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
 
-            # with open(filename, "w", encoding="utf-8") as f:
-            #     json.dump(crmRes, f, indent=4, ensure_ascii=False)
+                # with open(filename, "w", encoding="utf-8") as f:
+                #     json.dump(crmRes, f, indent=4, ensure_ascii=False)
 
-            if crmRes.get('success'):
-                orderData.transactionId = str(platOrderNo)
-                orderData.status = "SUCCESS"
-                orderData.tradingId = str(crmRes['result']['brokerUserExternalId'])
-                orderData.save()
-                print("--------------------Successs")
-                return Response({"code": "200", "msg": "success"}, status=status.HTTP_200_OK)
+                if crmRes.get('success'):
+                    orderData.transactionId = str(platOrderNo)
+                    orderData.status = "SUCCESS"
+                    orderData.tradingId = str(crmRes['result']['brokerUserExternalId'])
+                    orderData.save()
+                    print("--------------------Successs")
+                    return Response({"code": "200", "msg": "success"}, status=status.HTTP_200_OK)
             
             
             return Response({"code": "400", "status": "failed"}, status=status.HTTP_200_OK)
@@ -1226,26 +1228,29 @@ class CheezeePayOutWebhook(APIView):
             payer_upi_id = param_map.get("payerUpiId", "")
             gmt_end = param_map.get("gmtEnd")
 
+
             orderId = str(uuid.UUID(mchOrderNo))
             orderData = OrderDetails.objects.get(orderId = orderId)
 
             if orderData.status == "SUCCESS":
                 return Response({"code": "200", "msg": "Already processed"}, status=status.HTTP_200_OK)
             
+            print(orderStatus,"------------------350")
 
-            crmRes = crm_api.verify_withdrawal(
-                int(orderData.brokerBankingId),
-                method=17,
-                transactionId=str(mchOrderNo),
-                pspId=11
-            )
-            if crmRes.get('success'):
-                orderData.transactionId = str(platOrderNo)
-                orderData.status = "SUCCESS"
-                orderData.tradingId = str(crmRes['result']['brokerUserExternalId'])
-                orderData.save()
-                print("--------------------Successs")
-                return Response({"code": "200", "msg": "success"}, status=status.HTTP_200_OK)
+            if orderData.status == "PENDING" and int(orderStatus) == 1:
+                crmRes = crm_api.verify_withdrawal(
+                    int(orderData.brokerBankingId),
+                    method=17,
+                    transactionId=str(mchOrderNo),
+                    pspId=11
+                )
+                if crmRes.get('success'):
+                    orderData.transactionId = str(platOrderNo)
+                    orderData.status = "SUCCESS"
+                    orderData.tradingId = str(crmRes['result']['brokerUserExternalId'])
+                    orderData.save()
+                    print("--------------------Successs")
+                    return Response({"code": "200", "msg": "success"}, status=status.HTTP_200_OK)
             
             
             return Response({"code": "400", "status": "failed"}, status=status.HTTP_200_OK)
@@ -1277,7 +1282,7 @@ class CheezeePayUPIPayOut(APIView):
             payload = {
                 "appId": os.environ['CHEEZEE_PAY_APP_ID'],
                 "merchantId": os.environ['CHEEZEE_PAY_MERCHANT_ID'],
-                "mchOrderNo": str("1234456789"),
+                "mchOrderNo": str("12345432"),
                 "paymentMethod": "BANK_IN",
                 "amount": str(amount),
                 "name": "testing",
