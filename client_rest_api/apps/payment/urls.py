@@ -8,6 +8,7 @@ urlpatterns = [
    path('cheezeepay-upi-payout/', views.CheezeePayUPIPayOut.as_view(), name='cheesepay-upi-payin'),
 
    
+   path('bank-transfer/', views.BankTransfer.as_view(), name="bank-transfer"),
    path('match2pay-pay-in/', views.Match2PayPayIn.as_view(), name="match2pay-pay-in"),
    path('match2pay-pay-in-webhook/', views.Match2PayPayInWebHook.as_view(), name="match2pay-pay-in-webhook"),
    path('match2pay-pay-out-webhook/', views.Match2PayPayOutWebHook.as_view(), name="match2pay-pay-out-webhook"),

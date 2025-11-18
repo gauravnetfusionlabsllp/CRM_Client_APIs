@@ -30,10 +30,11 @@ class AuthTokenMiddleware(MiddlewareMixin):
 
         query = f"""
             SELECT user_id FROM auth_tokens
-            WHERE auth_token = '{auth_token}' AND is_invalid = 0
+            WHERE auth_token = '{auth_token}' 
         """
+        print(query)
         session = DBConnection._forFetchingJson(query, using='replica')
-
+        print(session, "================ 01")
         if not session:
             return JsonResponse(
                 {"success": False, "error": "Invalid or expired token."},
@@ -59,6 +60,7 @@ class GettingUnseriInfoMiddleware(MiddlewareMixin):
             return None
         
         if not request.headers.get("Auth-Token"):
+            print("================ 02")
             return JsonResponse({"error": "Invalid or expired token."}, status=401)
 
         query = f"""SELECT u.registration_app, u.email  FROM crmdb.users AS u where u.id={request.session_user}"""
