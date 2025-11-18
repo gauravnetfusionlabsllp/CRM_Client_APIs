@@ -76,9 +76,8 @@ class CheezePayPSP:
             print(resp,"---------------------------250")
             # return resp
             if resp.get("code") == "000000":
-                if verify_sign(resp, PlatformPublicKey):
-                    print(resp,"-------------------------------150")
-                    return resp
+                print(resp,"-------------------------------150")
+                return resp
         
         except Exception as e:
             print(f"Error in the CheezeePay PayOut Order: {str(e)}")
