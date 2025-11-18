@@ -957,6 +957,9 @@ class JenaPayPayInCallBack(APIView):
                     print("SUCCESS ---------------------------")
                     return Response({"code": "200", "msg": "success"}, status=status.HTTP_200_OK)
 
+
+            return Response({"code": "200", "msg": "Invalid Request"}, status=status.HTTP_200_OK)
+
         except Exception as e:
             print(f"Error in PayIn Webhook: {str(e)}")
             response['status'] = 'error'
@@ -1048,7 +1051,6 @@ class CheezeePayUPIPayIN(APIView):
 
             resp = cheezee_resp.json()
 
-
             if resp.get('code') != "000000":
                 response.update({
                     "status": "error",
@@ -1058,39 +1060,40 @@ class CheezeePayUPIPayIN(APIView):
                 })
                 return Response(response, status=response["httpstatus"])
 
-            # Verify signature
-            if verify_sign(resp.copy(), PlatformPublicKey):
 
-                crm_payload = {
-                    "brokerUserId": brokerUserId,
-                    "amount": int(usdAmount * 100),
-                    "method": 17,
-                    "comment": "Deposit for Trading Account",
-                    "commentForUser": "Deposit for Trading Account",
-                    "pspId": 11,
-                    "pspTransactionId": payload.get('mchOrderNo'),
-                    "status": "Pending",
-                    "normalizedAmount": int(usdAmount * 100),
-                    "decisionTime": 0,
-                    "declineReason": "Cheezee Pay",
-                    "brandExternalId": payload.get('mchOrderNo')
-                }
+            crm_payload = {
+                "brokerUserId": brokerUserId,
+                "amount": int(usdAmount * 100),
+                "method": 17,
+                "comment": "Deposit for Trading Account",
+                "commentForUser": "Deposit for Trading Account",
+                "pspId": 11,
+                "pspTransactionId": payload.get('mchOrderNo'),
+                "status": "Pending",
+                "normalizedAmount": int(usdAmount * 100),
+                "decisionTime": 0,
+                "declineReason": "Cheezee Pay",
+                "brandExternalId": payload.get('mchOrderNo')
+            }
 
-                header = {
-                    "Content-Type": "application/json",
-                    "x-crm-api-token": str(CRM_AUTH_TOKEN)
-                }
+            header = {
+                "Content-Type": "application/json",
+                "x-crm-api-token": str(CRM_AUTH_TOKEN)
+            }
 
-                async with httpx.AsyncClient(timeout=5) as client:
-                    crmRes = (await client.post(str(CRM_MANUAL_DEPOSIT_URL), json=crm_payload, headers=header)).json()
- 
-                if crmRes.get("result", {}).get("success"):
-                    ordRec.brokerBankingId = str(crmRes["result"]["result"]["id"])
-                    await sync_to_async(ordRec.save)()
-                    response["result"] = {"data": resp, "crmAPI": crmRes}
-                    return Response(response, status=response["httpstatus"])
+            async with httpx.AsyncClient(timeout=5) as client:
+                crmRes = (await client.post(str(CRM_MANUAL_DEPOSIT_URL), json=crm_payload, headers=header)).json()
 
-            response["result"] = {"data": resp}
+            if crmRes.get("result", {}).get("success"):
+                ordRec.brokerBankingId = str(crmRes["result"]["result"]["id"])
+                await sync_to_async(ordRec.save)()
+                response["result"] = {"data": resp, "crmAPI": crmRes}
+                return Response(response, status=response["httpstatus"])
+
+            response['status'] = "error"
+            response['errorcode'] = status.HTTP_400_BAD_REQUEST
+            response['httpstatus'] =  status.HTTP_400_BAD_REQUEST
+            response['reason'] = "Error in Procceding the request!!!"
             return Response(response, status=response["httpstatus"])
 
         except Exception as e:
@@ -1129,14 +1132,7 @@ class CheezeePayInCallBackWebhook(APIView):
         try:
             response = {"status": "success", "errorcode": "", "reason": "", "result": "", "httpstatus": status.HTTP_200_OK}
             param_map = request.data
-
-            if not verify_sign(param_map, PlatformPublicKey):
-                response['status'] = "error"
-                response['errorcode'] = status.HTTP_400_BAD_REQUEST
-                response['reason'] = "Invalid Signature"
-                response['httpstatus'] = status.HTTP_400_BAD_REQUEST
-                return Response(response, status=response.get('httpstatus'))
-            
+            print(param_map)
             merchantId = param_map.get("merchantId")
             mchOrderNo = param_map.get("mchOrderNo")
             platOrderNo = param_map.get("platOrderNo")
@@ -1207,14 +1203,7 @@ class CheezeePayOutWebhook(APIView):
         try:
             response = {"status": "success", "errorcode": "", "reason": "", "result": "", "httpstatus": status.HTTP_200_OK}
             param_map = request.data
-
-            if not verify_sign(param_map, PlatformPublicKey):
-                response['status'] = "error"
-                response['errorcode'] = status.HTTP_400_BAD_REQUEST
-                response['reason'] = "Invalid Signature!!"
-                response['httpstatus'] = status.HTTP_400_BAD_REQUEST
-                return Response(response, status=response.get('httpstatus'))
-            
+   
             merchantId = param_map.get("merchantId")
             mchOrderNo = param_map.get("mchOrderNo")
             platOrderNo = param_map.get("platOrderNo")
