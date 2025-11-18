@@ -282,6 +282,11 @@ class Match2PayPayIn(APIView):
 
 crm_api = CRM()
 
+class BankTransfer(APIView):
+    @check_and_update_user_category
+    def post(self, request):
+        response = {"status": "success", "errorcode": "", "reason": "", "result": "", "httpstatus": status.HTTP_201_CREATED}
+        return Response(response, status=response.get('httpstatus'))
 
 class WithdrawalRequest(APIView):
     @check_user_permissions
