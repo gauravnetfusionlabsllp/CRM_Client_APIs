@@ -233,7 +233,7 @@ class Match2PayPayIn(APIView):
                                         "method": "Crypto",
                                         "comment": "Deposit for Trading Account",
                                         "commentForUser": "Deposit for Trading Account",
-                                        "pspId": 14,
+                                        "pspId": 13 if request.registration_app == 2 else 16,
                                         "pspTransactionId": response_data.json().get("paymentId"),
                                         "status": "Pending",
                                         "normalizedAmount": int(amount)*100,
