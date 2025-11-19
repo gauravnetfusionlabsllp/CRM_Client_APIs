@@ -110,7 +110,7 @@ class Match2PayPayIn(APIView):
                 MATCH2PAY_PAY_API_TOKEN = MATCH2PAY_PAY_API_TOKEN_M
             request_body = request.data.get('data')
             print("request_body: ", request_body)
-            amount = request_body.get('amount')
+            amount = int(float(request_body.get('amountWithFees')))
             authToken = request.headers.get('Auth-Token')
             # authToken = request_body.get('Auth-Token')
             brokerUserId = request_body.get('brokerUserId')
