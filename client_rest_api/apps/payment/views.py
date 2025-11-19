@@ -110,13 +110,14 @@ class Match2PayPayIn(APIView):
                 MATCH2PAY_PAY_API_TOKEN = MATCH2PAY_PAY_API_TOKEN_M
             request_body = request.data.get('data')
             print("request_body: ", request_body)
-            amount = int(float(request_body.get('amountWithFees')))
+            amount_with_fees = int(float(request_body.get('amountWithFees')))
+            amount = int(float(request_body.get('amount')))
             authToken = request.headers.get('Auth-Token')
             # authToken = request_body.get('Auth-Token')
             brokerUserId = request_body.get('brokerUserId')
 
             print([amount, brokerUserId])
-            if not all([amount, brokerUserId]):
+            if not all([amount, amount_with_fees, brokerUserId]):
                 response['status'] = 'error'
                 response['errorcode'] = status.HTTP_400_BAD_REQUEST
                 response['reason'] = "Amount, Broker and brokerUserId are required fileds!!!"
@@ -156,7 +157,7 @@ class Match2PayPayIn(APIView):
             print(trading_info_data)
 
             payment_payload = {
-                "amount":amount,
+                "amount":amount_with_fees,
                 "customer":{
                             "firstName":str(data.get('first_name')) if data.get('first_name') else 'default',
                             "lastName":str(data.get('last_name')) if data.get('last_name') else 'default',
