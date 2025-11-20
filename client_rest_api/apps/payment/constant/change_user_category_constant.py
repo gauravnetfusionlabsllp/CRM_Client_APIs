@@ -5,8 +5,11 @@ from rest_framework.response import Response
 
 from apps.core.DBConnection import *
 from apps.core.telegram_api import *
+from apps.users.models import RegistrationLog
+from apps.users.serializers import RegistrationLogSerializer, ChangeReguslationLogSerializer
 import os
 import json
+import uuid
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -43,6 +46,7 @@ def check_and_update_user_category(view_func):
     @wraps(view_func)
     def wrapped_view(self, request, *args, **kwargs):
         try:
+            response = {"status": "success", "errorcode": "", "reason":"", "result": ""}
             data = json.loads(TELEGRAM_SETTINGS)
             print("===============",data)
                         # SELECT bu.username, bu.first_name, bu.last_name, bu.external_id  FROM crmdb.broker_user AS bu where bu.user_id ={request.session_user} and bu.broker_id=1001
@@ -52,13 +56,30 @@ def check_and_update_user_category(view_func):
                         SELECT bu.username, bu.first_name, bu.last_name, bu.external_id  FROM crmdb.broker_user AS bu where bu.user_id ={request.session_user}
                     """
             user_data = DBConnection._forFetchingJson(query, using='replica')
-            mssg = create_client_message(user_data)
-            teletram_ins.send_telegram_message(data.get('convert_client_info_bot'), mssg)
-            print(mssg)
+            new_uuid = uuid.uuid4()
+            reqdata = {
+                    "old_email": user_data[0].get("username", ""),
+                    "uuid": str(new_uuid),
+                }
+            print(reqdata)
+            serializer = ChangeReguslationLogSerializer(data=reqdata)
+            if serializer.is_valid():
+                serializer.save()
+                print(serializer.validated_data, '------- 01')
+                mssg = create_client_message(user_data)
+                teletram_ins.send_telegram_message(data.get('convert_client_info_bot'), mssg)
+                print(mssg)
+            if not serializer.is_valid():
+                print("ERRORS:", serializer.errors)
         except Exception as e:
             print("ERROR in check_and_update_user_category: ", str(e))
         
-        return Response({"success": True, "error": "Your request is submitted. Support will contact you within 24 hours."} ,status=201)
+        print("=================== 01")
+        response["result"] = {
+            "uuid":new_uuid,
+            "old_email":user_data[0].get('username','')
+        }
+        return Response(response, status=200)
             
         return view_func(self, request, *args, **kwargs)
          

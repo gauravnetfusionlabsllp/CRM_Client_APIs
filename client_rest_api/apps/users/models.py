@@ -29,3 +29,10 @@ class RegistrationLog(models.Model):
 
     def __str__(self):
         return f"{self.email}"
+
+class ChangeReguslationLog(models.Model):
+    email = models.EmailField(blank=True, null=True, unique=True)
+    old_email = models.EmailField(blank=True, null=True)
+    uuid = models.CharField(max_length=100, blank=True, null=True, unique=True)
+    def __str__(self):
+        return f"{self.old_email}"
