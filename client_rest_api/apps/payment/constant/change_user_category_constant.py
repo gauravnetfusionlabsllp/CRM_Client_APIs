@@ -41,6 +41,34 @@ def create_client_message(data):
     )
     return msg
 
+def register_client_message(old_data, new_data):
+    # assume all records belong to same client
+    first = old_data[0]
+
+    name = f"{first['first_name']} {first['last_name']}"
+    email = first['username']
+    trading_ids = ", ".join([d['external_id'] for d in old_data])
+
+    new_first = new_data[0]
+
+    new_name = f"{new_first['first_name']} {new_first['last_name']}"
+    new_email = new_first['username']
+    new_trading_ids = ", ".join([d['external_id'] for d in new_data])
+
+
+    msg = (
+        f"*Old Account Details:* \n"
+        f"*Client Name:* {name}\n"
+        f"*Email:* {email}\n\n"
+        f"*Trading IDs:* {trading_ids}\n\n"
+        f"*New Account Details:* \n"
+        f"*Client Name:* {new_name}\n"
+        f"*Email:* {new_email}\n\n"
+        f"*Trading IDs:* {new_trading_ids}\n\n"
+        "This client wants to switch their account from *Saint Lucia* regulation to *Mauritius* regulation."
+    )
+    return msg
+
 
 def check_and_update_user_category(view_func):
     @wraps(view_func)
