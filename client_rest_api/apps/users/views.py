@@ -8,22 +8,30 @@ from django.http import JsonResponse
 from rest_framework import status
 from apps.core.WhatsAppLink import create_whatsapp_link
 from django.core.cache import cache
-
+import uuid
 from apps.dashboard_admin.models import WithdrawalApprovals
 
 import tempfile
 import os
 from apps.users.helper.extractai import *
 from apps.users.serializers import *
+from apps.core.telegram_api import *
 import requests
 from dotenv import load_dotenv
 import json
 
+from apps.payment.constant.change_user_category_constant import *
 from apps.users.helpers.twilio_sending_message_helpers import send_text_message, verify_otp
 
 # Create your views here.
 
 load_dotenv()
+
+CRM_PUT_USER = os.environ['CRM_PUT_USER']
+CRM_AUTH_TOKEN = os.environ.get('CRM_AUTH_TOKEN')
+CRM_PUT_KYC = os.environ.get('CRM_PUT_KYC')
+TELEGRAM_SETTINGS = os.environ.get('TELEGRAM_SETTINGS')
+teletram_ins = TelegramAPI()
 
 class CheckUserPhoneNumber(APIView):
 
@@ -288,6 +296,69 @@ class ExtractDocumentData(APIView):
             response["reason"] = str(e)
             response["httpstatus"] = HTTP_400_BAD_REQUEST
             return JsonResponse(response, status=response['httpstatus'])
+
+
+class ChangeRegulation(APIView):
+    def post(self, request):
+        try:
+            response = {"status": "success", "errorcode": "","reason": "", "result": "", "httpstatus": HTTP_200_OK}
+            __data = request.data            
+            settings_data = json.loads(TELEGRAM_SETTINGS)
+            ref_link = request.headers.get("Ref-Link", "")
+
+            # print("HEADER UUID:", repr(clean_uuid))
+
+            try:
+                query = f"""
+                        SELECT bu.username, bu.first_name, bu.last_name, bu.external_id  FROM crmdb.broker_user AS bu where bu.user_id ={request.session_user}
+                    """
+                new_user_data = DBConnection._forFetchingJson(query, using='replica')
+
+
+                clean_uuid = str(uuid.UUID(ref_link))
+                user_obj = ChangeReguslationLog.objects.get(uuid=clean_uuid)
+                query = f"""
+                        SELECT bu.username, bu.first_name, bu.last_name, bu.external_id  FROM crmdb.broker_user AS bu where bu.username ={user_obj.old_email}
+                    """
+                old_user_data = DBConnection._forFetchingJson(query, using='replica')
+                
+                mssg = create_client_message(old_user_data, new_user_data)
+                teletram_ins.send_telegram_message(settings_data.get('convert_client_info_bot'), mssg)
+
+                print("FOUND OBJECT:", user_obj)
+                if user_obj.old_email:
+                    userid =  request.session_user
+                    payload = {
+                                    "registrationAppId": "1",
+                                    "id": userid
+                                }
+                    headers = {
+                                    "Content-Type": "application/json",
+                                    "x-crm-api-token": str(CRM_AUTH_TOKEN)
+                                }
+                    resp = requests.put(CRM_PUT_USER, json=payload, headers=headers).json()
+                    if resp['success']:
+                        response['httpstatus'] = HTTP_200_OK
+                        response['status'] = "success"
+                        response['result'] = f"{request.session_user} is shifted to the MU regulation!!"
+                    else:
+                        response['httpstatus'] = HTTP_200_OK
+                        response['status'] = "success"
+                        response['result'] = f"Something went wrong!!!!!"
+                    
+            except ChangeReguslationLog.DoesNotExist:
+                print("NO OBJECT FOUND")
+
+                # if link_data:
+                # else:
+            
+            return JsonResponse(response, status=response['httpstatus'])
+        except Exception as e:
+            response["status"] = "error"
+            response["reason"] = str(e)
+            response["httpstatus"] = HTTP_400_BAD_REQUEST
+            return JsonResponse(response, status=response['httpstatus'])
+        
 
 class GenerateWPLink(APIView):
     def post(self, request):
