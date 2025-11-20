@@ -65,7 +65,7 @@ def register_client_message(old_data, new_data):
         f"*Client Name:* {new_name}\n"
         f"*Email:* {new_email}\n\n"
         f"*Trading IDs:* {new_trading_ids}\n\n"
-        "This client wants to switch their account from *Saint Lucia* regulation to *Mauritius* regulation."
+        "This client has been switch their account from *Saint Lucia* regulation to *Mauritius* regulation."
     )
     return msg
 
