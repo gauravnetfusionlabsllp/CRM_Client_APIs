@@ -38,6 +38,13 @@ from apps.payment.serializers import *
 from apps.dashboard_admin.serializers import *
 from apps.core.DBConnection import *
 from apps.payment.services.psp_router import PSPRouter
+
+from apps.users.helper.extractai import *
+from apps.users.serializers import *
+from apps.core.telegram_api import *
+
+
+
 import mysql.connector
 
 import uuid
@@ -51,6 +58,10 @@ from apps.users.helpers.twilio_sending_message_helpers import send_text_message,
 
 from apps.payment.constant.change_user_category_constant import check_and_update_user_category
 from apps.payment.services.psp_mat2pay_methods import payment_getway
+from apps.payment.constant.change_user_category_constant import *
+from apps.users.helpers.twilio_sending_message_helpers import send_text_message, verify_otp
+
+
 
 # ---------------Jena Pay--------------------------
 
@@ -81,7 +92,11 @@ connection = mysql.connector.connect(
     database= str(os.environ['CLIENT_DB_DATABASE'])
 )
 
-
+CRM_PUT_USER = os.environ['CRM_PUT_USER']
+CRM_AUTH_TOKEN = os.environ.get('CRM_AUTH_TOKEN')
+CRM_PUT_KYC = os.environ.get('CRM_PUT_KYC')
+TELEGRAM_SETTINGS = os.environ.get('TELEGRAM_SETTINGS')
+teletram_ins = TelegramAPI()
 # Create your views here.
 # --------------------------- MATCH 2 PAY -----------------------------------
 MATCH2PAY_PAYIN_URL = os.environ.get('MATCH2PAY_PAYIN_URL')
@@ -1382,6 +1397,76 @@ class BankingDetailsRequest(APIView):
             response["result"] = []
             response["httpstatus"] = status.HTTP_400_BAD_REQUEST
             return Response(response, status=response.get('httpstatus'))
+
+
+
+
+
+
+
+class ChangeRegulation(APIView):
+    def post(self, request):
+        try:
+            response = {"status": "success", "errorcode": "","reason": "", "result": "", "httpstatus": status.HTTP_200_OK}
+            __data = request.data            
+            settings_data = json.loads(TELEGRAM_SETTINGS)
+            ref_link = request.headers.get("Ref-Link", "")
+
+            # print("HEADER UUID:", repr(clean_uuid))
+
+            try:
+                query = f"""
+                        SELECT bu.username, bu.first_name, bu.last_name, bu.external_id  FROM crmdb.broker_user AS bu where bu.user_id ={request.session_user}
+                    """
+                new_user_data = DBConnection._forFetchingJson(query, using='replica')
+
+
+                clean_uuid = str(uuid.UUID(ref_link))
+                user_obj = ChangeReguslationLog.objects.get(uuid=clean_uuid)
+                query = f"""
+                        SELECT bu.username, bu.first_name, bu.last_name, bu.external_id  FROM crmdb.broker_user AS bu where bu.username ='{user_obj.old_email}'
+                    """
+                old_user_data = DBConnection._forFetchingJson(query, using='replica')
+                
+                mssg = register_client_message(old_user_data, new_user_data)
+                teletram_ins.send_telegram_message(settings_data.get('convert_client_info_bot'), mssg)
+
+                if user_obj.old_email:
+                    userid =  request.session_user
+                    payload = {
+                                    "registrationAppId": "1",
+                                    "id": userid
+                                }
+                    headers = {
+                                    "Content-Type": "application/json",
+                                    "x-crm-api-token": str(CRM_AUTH_TOKEN)
+                                }
+                    resp = requests.put(CRM_PUT_USER, json=payload, headers=headers).json()
+                    if resp['success']:
+                        response['httpstatus'] = status.HTTP_200_OK
+                        response['status'] = "success"
+                        response['result'] = f"{request.session_user} is shifted to the MU regulation!!"
+                    else:
+                        response['httpstatus'] = status.HTTP_200_OK
+                        response['status'] = "success"
+                        response['result'] = f"Something went wrong!!!!!"
+                    
+            except ChangeReguslationLog.DoesNotExist:
+                print("ERROR in : ChangeReguslationLog" )
+
+                # if link_data:
+                # else:
+            
+            return JsonResponse(response, status=response['httpstatus'])
+        except Exception as e:
+            response["status"] = "error"
+            response["reason"] = str(e)
+            response["httpstatus"] = status.HTTP_400_BAD_REQUEST
+            return JsonResponse(response, status=response['httpstatus'])
+        
+
+
+
 
 #     def post(self, request):
 #         try:
