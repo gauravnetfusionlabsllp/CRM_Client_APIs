@@ -53,6 +53,7 @@ class CRM:
         payload = {
             "brokerUserId": data.get("brokerUserId"),
             "amount": final_amount,
+            "method": "Crypto" if data.get('pspName') == 'match2pay' else "BonusProtectedPositionCashback",
             "fee": 0,
             "withdrawalSubType": 1,
             "comment": "Manual bank withdrawal",
