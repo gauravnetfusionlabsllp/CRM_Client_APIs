@@ -37,4 +37,6 @@ urlpatterns = [
 
    path('change-regulation/', views.ChangeRegulation.as_view(), name="change-regulation"),
 
+   path('cancel-withdarawl-request/', views.CancelWithdrawalRequest.as_view(), name="cancel-withdarawl-request/"),
+
 ]

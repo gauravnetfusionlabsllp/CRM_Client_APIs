@@ -2,6 +2,7 @@ from rest_framework import serializers
 from .models import WithdrawalApprovals
 
 class WithdrawalApprovalSerializer(serializers.ModelSerializer):
+    tradingId = serializers.SerializerMethodField()
     class Meta:
         model = WithdrawalApprovals
         fields = [
@@ -24,7 +25,8 @@ class WithdrawalApprovalSerializer(serializers.ModelSerializer):
             "second_approval_note",
             "brokerBankingId",
             "ordertransactionid",
-            "bankDetails"
+            "bankDetails",
+            "tradingId"
         ]
         read_only_fields = [
             "first_approval_by",
@@ -36,3 +38,9 @@ class WithdrawalApprovalSerializer(serializers.ModelSerializer):
             "second_approval_at",
             "second_approval_note",
         ]
+
+    def get_tradingId(self, obj):
+        # If FK exists, return tradingId, else None
+        if obj.ordertransactionid:
+            return obj.ordertransactionid.tradingId
+        return None

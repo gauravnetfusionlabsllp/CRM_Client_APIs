@@ -39,16 +39,17 @@ class CheckUserPhoneNumber(APIView):
         try:
             response = {"status": "success", "errorcode": "", "reason":"", "result": "", "httpstatus": status.HTTP_200_OK}
             phoneNo = request.query_params.get('ph')
-            print(phoneNo,"------------------test")
+            isCall = int(request.query_params.get('isCall',0))
+            print(phoneNo,isCall,"------------------test")
 
-            if not phoneNo:
+            if not all([phoneNo]):
                 response['status'] = 'error'
                 response['errorcode'] = status.HTTP_400_BAD_REQUEST
                 response['reason'] =  "Phone Number is Required!!!"
                 response['httpstatus'] = status.HTTP_400_BAD_REQUEST
                 return Response(response, status=response.get('httpstatus'))
 
-            res = send_text_message(phoneNo)
+            res = send_text_message(phoneNo, isCall)
 
             if not res:
                 response['status'] = 'error'
@@ -79,6 +80,7 @@ class VerifyUserPhoneNumber(APIView):
             data = request.data.get('data')
             phoneNo = data.get('phoneNo')
             otp = data.get('otp')
+            isCall = data.get('isCall', 0)
 
             
             if event == "withdrawal-OTP":
@@ -101,7 +103,7 @@ class VerifyUserPhoneNumber(APIView):
                     }
                     return Response(response, status=response['httpstatus'])
                 
-                res = verify_otp(phoneNo, otp)
+                res = verify_otp(phoneNo, otp, isCall)
                 if res:
                     if not withObj.otpVerified:
                         withObj.otpVerified = True
@@ -118,7 +120,7 @@ class VerifyUserPhoneNumber(APIView):
                 response['httpstatus'] = status.HTTP_400_BAD_REQUEST
                 return Response(response, status=response.get('httpstatus'))
             
-            res = verify_otp(phoneNo, otp)
+            res = verify_otp(phoneNo, otp, isCall)
             if res:
                 response['reason'] = "OTP Verified Successfully!!!!"
                 return Response(response, status=response.get('httpstatus'))

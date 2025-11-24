@@ -1587,6 +1587,7 @@ class SendWithdrawalRequestOTP(APIView):
             response = {"status": "success", "errorcode": "", "result": "", "reason": "", "httpstatus": status.HTTP_200_OK}
 
             data = request.data.get('data')
+            isCall = int(data.get('isCall', 0))
             userId = request.session_user
             query = f"""SELECT u.telephone_prefix, u.telephone FROM crmdb.users AS u where u.id = {int(userId)}"""
 
@@ -1602,7 +1603,7 @@ class SendWithdrawalRequestOTP(APIView):
             formatNumber = str(userData.get('telephone_prefix'))+ str(userData.get('telephone'))
 
             print(formatNumber, "-----------------------150")
-            res = send_text_message(formatNumber)
+            res = send_text_message(formatNumber, isCall)
 
             if res:
                 withdrawalObj = WithdrawalApprovals.objects.create(
@@ -1648,11 +1649,12 @@ class VerifyWithdrawalOTP(APIView):
             phoneNo = data.get('phoneNo')
             otp = data.get('otp')
             withdrawalId = int(data.get('withdrawalId'))
+            isCall = int(data.get('isCall', 0))
 
             if not all([phoneNo, otp, withdrawalId]):
                 response['status'] = 'error'
                 response['errorcode'] = status.HTTP_400_BAD_REQUEST
-                response['reason'] = 'Phone No, OTP and Withdrawal Id are required!!'
+                response['reason'] = 'Phone No, OTP, isCall and Withdrawal Id are required!!'
                 response['httpstatus'] = status.HTTP_400_BAD_REQUEST
                 return Response(response, status=response.get('httpstatus'))
             
@@ -1668,7 +1670,7 @@ class VerifyWithdrawalOTP(APIView):
                 return Response(response, status=response['httpstatus'])
             
 
-            res = verify_otp(phoneNo, otp)
+            res = verify_otp(phoneNo, otp, isCall)
             if res:
                 if not withObj.otpVerified:
                     withObj.otpVerified = True
@@ -1687,6 +1689,55 @@ class VerifyWithdrawalOTP(APIView):
 
         except Exception as e:
             print(f"Error in verifing in the Withdrawal OTP : {str(e)}")
+            response['status'] = 'error'
+            response['errorcode'] = status.HTTP_400_BAD_REQUEST
+            response['reason'] = str(e)
+            response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+            return Response(response, status=response.get('httpstatus'))
+        
+
+class CancelWithdrawalRequest(APIView):
+
+    def delete(self, request):
+        try:
+            response = {"status":"success", "errorcode": "", "reason": "", "result": "", "httpstatus": status.HTTP_200_OK}
+
+            transId = request.query_params.get('transId')
+            
+            if not transId:
+                response['status'] = 'error'
+                response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                response['reason'] = "Transaction Id is required!!!"
+                response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                return Response(response, status=response.get('httpstatus'))
+            
+            withdrawalRes = CRM()
+            res = withdrawalRes.cancel_withdrawal(withdrawalID=transId)
+
+            if not res['success']:
+                response['status'] = 'error'
+                response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                response['reason'] = "Unable to cancel pending request!!!"
+                response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                return Response(response, status=response.get('httpstatus'))
+            
+
+            order = OrderDetails.objects.filter(brokerBankingId=transId).first()
+
+            if order:
+                WithdrawalApprovals.objects.filter(ordertransactionid=order).delete()
+                order.delete()
+                response['result'] = "Withdrawal Request Cancelled Successfully!!!"
+                return Response(response, status=response.get('httpstatus'))
+            else:
+                response['status'] = 'error'
+                response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                response['reason'] = "Failed to cancel withdrawal request!!!"
+                response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                return Response(response, status=response.get('httpstatus'))
+
+        except Exception as e:
+            print(f"Error in cancelling the Withdrawal Request: {str(e)}")
             response['status'] = 'error'
             response['errorcode'] = status.HTTP_400_BAD_REQUEST
             response['reason'] = str(e)
