@@ -55,7 +55,7 @@ def verify_otp(phoneNo, otp, isCall):
             )
 
         if not check.valid:
-            return True
+            return False
         
         return True
     
