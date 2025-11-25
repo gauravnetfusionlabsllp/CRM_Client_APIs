@@ -6,7 +6,7 @@ from rest_framework.views import APIView, csrf_exempt
 
 from apps.payment.helpers.payment_signature_creater_helpers import get_sign, verify_sign
 from apps.payment.constant.cheesee_pay_key_constant import PlatformPublicKey, MerchantPrivateKey, headers, CryptoPrivateKey, CryptoPublickey
-
+from django.core.cache import cache
 import threading
 
 from decimal import Decimal
@@ -53,7 +53,7 @@ from django.utils import timezone
 from .utils.decorators import check_user_permissions
 from .services.crm_apis import CRM
 
-from apps.users.helpers.twilio_sending_message_helpers import send_text_message, verify_otp
+from apps.users.helpers.twilio_sending_message_helpers import send_text_message, verify_otp, generate_and_send_otp
 
 
 from apps.payment.constant.change_user_category_constant import check_and_update_user_category
@@ -1589,7 +1589,7 @@ class SendWithdrawalRequestOTP(APIView):
             data = request.data.get('data')
             isCall = int(data.get('isCall', 0))
             userId = request.session_user
-            query = f"""SELECT u.telephone_prefix, u.telephone FROM crmdb.users AS u where u.id = {int(userId)}"""
+            query = f"""SELECT u.telephone_prefix, u.telephone, u.email FROM crmdb.users AS u where u.id = {int(userId)}"""
 
             userData = DBConnection._forFetchingJson(query, using='replica')
             if not userData:
@@ -1623,6 +1623,27 @@ class SendWithdrawalRequestOTP(APIView):
                     "withdrawalId" : withdrawalObj.id
                 }
                 return Response(response, status=response.get('httpstatus'))
+            
+            else:
+                email = userData.get('email')
+                resEmail = generate_and_send_otp(email)
+                withdrawalObj = WithdrawalApprovals.objects.create(
+                    userId = data.get('user_id'),
+                    brokerUserId = data.get('brokerUserId'),
+                    email = data.get('email'),
+                    amount = data.get('amount'),
+                    walletAddress = data.get('walletAddress'),
+                    currency = data.get('currency'),
+                    pspName = data.get('pspName'),
+                    bankDetails = data.get('bankDetails')
+                )
+                withdrawalObj.save()
+                if resEmail:
+                    response['reason'] = "OTP sent on the register Email Id!!!"
+                    response['result'] = {
+                        "withdrawalId" : withdrawalObj.id
+                    }
+                    return Response(response, status=response.get('httpstatus'))
 
             response['status'] = 'error'
             response['errorcode'] = status.HTTP_200_OK
@@ -1650,11 +1671,14 @@ class VerifyWithdrawalOTP(APIView):
             otp = data.get('otp')
             withdrawalId = int(data.get('withdrawalId'))
             isCall = int(data.get('isCall', 0))
+            email = data.get('email')
+            
 
-            if not all([phoneNo, otp, withdrawalId]):
+
+            if not all([phoneNo, otp, withdrawalId, email]):
                 response['status'] = 'error'
                 response['errorcode'] = status.HTTP_400_BAD_REQUEST
-                response['reason'] = 'Phone No, OTP, isCall and Withdrawal Id are required!!'
+                response['reason'] = 'Phone No, Email, OTP, isCall and Withdrawal Id are required!!'
                 response['httpstatus'] = status.HTTP_400_BAD_REQUEST
                 return Response(response, status=response.get('httpstatus'))
             
@@ -1671,6 +1695,7 @@ class VerifyWithdrawalOTP(APIView):
             
 
             res = verify_otp(phoneNo, otp, isCall)
+            
             if res:
                 if not withObj.otpVerified:
                     withObj.otpVerified = True
@@ -1680,7 +1705,16 @@ class VerifyWithdrawalOTP(APIView):
                 
                 response['reason'] = "Withdrawal Order Already Verified!!"
                 return Response(response, status=response.get('httpstatus'))
-            
+            else: 
+                saved_otp = cache.get(f"otp_{email}")
+                print(saved_otp, otp)
+                if int(saved_otp) == int(otp):
+                    if not withObj.otpVerified:
+                        withObj.otpVerified = True
+                        withObj.save()
+                    response['reason'] = "OTP Verified Successfully!!!!"
+                    return Response(response, status=response.get('httpstatus'))
+
             response['status'] = 'error'
             response['errorcode'] = status.HTTP_400_BAD_REQUEST
             response['reason'] = "Invalid OTP!!!!"
