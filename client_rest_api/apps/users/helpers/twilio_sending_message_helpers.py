@@ -109,7 +109,7 @@ def generate_and_send_otp(email):
                                     <td align="center" style="padding:30px 25px;text-align:center;">
                                     <h2 style="font-size:22px;font-weight:700;color:#111827;margin-bottom:12px;">Verify Your Identity</h2>
                                     <p style="font-size:16px;line-height:1.6;color:#4b5563;margin-bottom:20px;">
-                                        We’ve generated a one-time password OTP for your verification. Please use the code below to continue. This code is valid for <strong>5 minutes</strong>.
+                                        We’ve generated a one-time password OTP for your verification. Please use the code below to continue. This code is valid for <strong>10 minutes</strong>.
                                     </p>
 
                                     <div style="display:inline-block;background:#f9fafb;border:2px dashed #dbeafe;border-radius:10px;padding:18px 28px;font-size:32px;font-weight:700;letter-spacing:6px;color:#1e3a8a;margin-bottom:18px;">
