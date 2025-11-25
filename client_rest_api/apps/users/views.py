@@ -21,7 +21,7 @@ from dotenv import load_dotenv
 import json
 
 from apps.payment.constant.change_user_category_constant import *
-from apps.users.helpers.twilio_sending_message_helpers import send_text_message, verify_otp
+from apps.users.helpers.twilio_sending_message_helpers import send_text_message, verify_otp, generate_and_send_otp
 
 # Create your views here.
 
@@ -40,22 +40,28 @@ class CheckUserPhoneNumber(APIView):
             response = {"status": "success", "errorcode": "", "reason":"", "result": "", "httpstatus": status.HTTP_200_OK}
             phoneNo = request.query_params.get('ph')
             isCall = int(request.query_params.get('isCall',0))
+            email = request.query_params.get('email')
             print(phoneNo,isCall,"------------------test")
 
-            if not all([phoneNo]):
+            if not all([phoneNo, email]):
                 response['status'] = 'error'
                 response['errorcode'] = status.HTTP_400_BAD_REQUEST
-                response['reason'] =  "Phone Number is Required!!!"
+                response['reason'] =  "Phone Number and Email are Required!!!"
                 response['httpstatus'] = status.HTTP_400_BAD_REQUEST
                 return Response(response, status=response.get('httpstatus'))
 
             res = send_text_message(phoneNo, isCall)
 
             if not res:
-                response['status'] = 'error'
-                response['errorcode'] = status.HTTP_400_BAD_REQUEST
-                response['reason'] = "OTP not sent!!!"
-                response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                emailRes = generate_and_send_otp(email)
+                if not emailRes:
+                    response['status'] = 'error'
+                    response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                    response['reason'] = "OTP not sent!!!"
+                    response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                    return Response(response, status=response.get('httpstatus'))
+                
+                response['reason'] = "OTP sent on your Email ID!!!"
                 return Response(response, status=response.get('httpstatus'))
             
             response['result'] = f"OTP Send Successfully on {phoneNo}"
@@ -81,6 +87,14 @@ class VerifyUserPhoneNumber(APIView):
             phoneNo = data.get('phoneNo')
             otp = data.get('otp')
             isCall = data.get('isCall', 0)
+            email = data.get('email')
+
+            if not all([phoneNo, otp, email]):
+                response['status'] = 'error'
+                response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                response['reason'] = "Phone No, OTP and Email are Required"
+                response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                return Response(response, status=response.get('httpstatus'))
 
             
             if event == "withdrawal-OTP":
@@ -114,6 +128,7 @@ class VerifyUserPhoneNumber(APIView):
                     response['reason'] = "Withdrawal Order Already Verified!!"
                     return Response(response, status=response.get('httpstatus'))
                 
+                
                 response['status'] = 'error'
                 response['errorcode'] = status.HTTP_400_BAD_REQUEST
                 response['reason'] = "Invalid OTP!!!!"
@@ -124,6 +139,12 @@ class VerifyUserPhoneNumber(APIView):
             if res:
                 response['reason'] = "OTP Verified Successfully!!!!"
                 return Response(response, status=response.get('httpstatus'))
+            
+            else:
+                saved_otp = cache.get(f"otp_{email}")
+                if int(saved_otp) == int(otp):
+                    response['reason'] = "OTP Verified Successfully!!!!"
+                    return Response(response, status=response.get('httpstatus'))
 
             response['status'] = 'error'
             response['errorcode'] = status.HTTP_400_BAD_REQUEST
