@@ -1646,9 +1646,9 @@ class SendWithdrawalRequestOTP(APIView):
                     return Response(response, status=response.get('httpstatus'))
 
             response['status'] = 'error'
-            response['errorcode'] = status.HTTP_400_BAD_REQUEST
-            response['reason'] = "Failed to send OTP!!!"
-            response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+            response['errorcode'] = status.HTTP_200_OK
+            response['reason'] = "Failed to send otp, you can continue via call!!!"
+            response['httpstatus'] = status.HTTP_200_OK
             return Response(response, status=response.get('httpstatus'))
 
         except Exception as e:
