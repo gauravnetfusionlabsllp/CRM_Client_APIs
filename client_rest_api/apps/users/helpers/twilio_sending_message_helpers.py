@@ -77,7 +77,7 @@ def verify_otp(phoneNo, otp, isCall):
 def generate_and_send_otp(email):
     try:
         otp = str(random.randint(100000, 999999))  # 6-digit OTP
-        cache.set(f"otp_{email}", otp, timeout=300)  # Store for 5 mins
+        cache.set(f"otp_{email}", otp, timeout=600)  # Store for 5 mins
         
         msg = EmailMessage()
         msg['Subject'] = 'Your OTP Code'
