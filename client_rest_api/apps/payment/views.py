@@ -319,7 +319,8 @@ class WithdrawalRequest(APIView):
             # ✅ Filter queryset
             approvals_qs = WithdrawalApprovals.objects.filter(
                 amount__gte=request.min_visible_amount,
-                amount__lte=request.max_visible_amount
+                amount__lte=request.max_visible_amount,
+                otpVerified=True
             ).order_by('-id')
 
             # ✅ Get total count before pagination
