@@ -142,7 +142,7 @@ def extract_from_image(image_path: str, doc_hint: str = "") -> dict:
 
     if ext == ".pdf":
         print("Pricessing")
-        images = pdf2image.convert_from_path(image_path)
+        images = pdf2image.convert_from_path(image_path, poppler_path="/usr/bin")
         print(images)
     else:
         images = [image_path]
