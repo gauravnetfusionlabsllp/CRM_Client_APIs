@@ -43,7 +43,7 @@ class CheckUserPhoneNumber(APIView):
             email = request.query_params.get('email')
             print(phoneNo,isCall,"------------------test")
 
-            if not all([phoneNo, email]):
+            if not all([phoneNo]):
                 response['status'] = 'error'
                 response['errorcode'] = status.HTTP_400_BAD_REQUEST
                 response['reason'] =  "Phone Number and Email are Required!!!"
