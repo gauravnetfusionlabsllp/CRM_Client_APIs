@@ -31,6 +31,8 @@ CRM_PUT_USER = os.environ['CRM_PUT_USER']
 CRM_AUTH_TOKEN = os.environ.get('CRM_AUTH_TOKEN')
 CRM_PUT_KYC = os.environ.get('CRM_PUT_KYC')
 TELEGRAM_SETTINGS = os.environ.get('TELEGRAM_SETTINGS')
+settings_data = json.loads(TELEGRAM_SETTINGS)
+
 teletram_ins = TelegramAPI()
 
 class CheckUserPhoneNumber(APIView):
@@ -60,10 +62,12 @@ class CheckUserPhoneNumber(APIView):
                     response['reason'] = "OTP not sent!!!"
                     response['httpstatus'] = status.HTTP_400_BAD_REQUEST
                     return Response(response, status=response.get('httpstatus'))
-                
+                mssg = error_response(phoneNo, email, "Requested for registration!!!")
+                teletram_ins.send_telegram_message(settings_data.get('convert_client_info_bot'), mssg)
                 response['reason'] = "OTP sent on your Email ID!!!"
                 return Response(response, status=response.get('httpstatus'))
-            
+            mssg = error_response(phoneNo, email, "Requested for registration!!!")
+            teletram_ins.send_telegram_message(settings_data.get('convert_client_info_bot'), mssg)
             response['result'] = f"OTP Send Successfully on {phoneNo}"
             return Response(response, status=response.get('httpstatus'))
 
@@ -73,6 +77,10 @@ class CheckUserPhoneNumber(APIView):
             response['errorcode'] = status.HTTP_400_BAD_REQUEST
             response['reason'] = str(e)
             response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+            phoneNo = request.query_params.get('ph')
+            email = request.query_params.get('email')
+            mssg = error_response(phoneNo, email, str(e))
+            teletram_ins.send_telegram_message(settings_data.get('convert_client_info_bot'), mssg)
             return Response(response, status=response.get('httpstatus'))
         
 
@@ -135,14 +143,19 @@ class VerifyUserPhoneNumber(APIView):
                 response['httpstatus'] = status.HTTP_400_BAD_REQUEST
                 return Response(response, status=response.get('httpstatus'))
             
+            print("================01", cache.get(f"otp_{email}"))
             res = verify_otp(phoneNo, otp, isCall)
             if res:
+                mssg = error_response(phoneNo, email, "OTP Verified Successfully")
+                teletram_ins.send_telegram_message(settings_data.get('convert_client_info_bot'), mssg)
                 response['reason'] = "OTP Verified Successfully!!!!"
                 return Response(response, status=response.get('httpstatus'))
             
             else:
-                saved_otp = cache.get(f"otp_{email}")
+                saved_otp = cache.get(f"otp_{email}", 0)
                 if int(saved_otp) == int(otp):
+                    mssg = error_response(phoneNo, email, "OTP Verified Successfully")
+                    teletram_ins.send_telegram_message(settings_data.get('convert_client_info_bot'), mssg)
                     response['reason'] = "OTP Verified Successfully!!!!"
                     return Response(response, status=response.get('httpstatus'))
 
@@ -150,6 +163,9 @@ class VerifyUserPhoneNumber(APIView):
             response['errorcode'] = status.HTTP_400_BAD_REQUEST
             response['reason'] = "Invalid OTP!!!!"
             response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+            
+            mssg = error_response(phoneNo, email, "Entered Invalid OTP")
+            teletram_ins.send_telegram_message(settings_data.get('convert_client_info_bot'), mssg)
             return Response(response, status=response.get('httpstatus'))
 
         except Exception as e:
@@ -158,6 +174,11 @@ class VerifyUserPhoneNumber(APIView):
             response['errorcode'] = status.HTTP_400_BAD_REQUEST
             response['reason'] = str(e)
             response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+            data = request.data.get('data')
+            phoneNo = data.get('phoneNo')
+            email = data.get('email')
+            mssg = error_response(phoneNo, email, str(e))
+            teletram_ins.send_telegram_message(settings_data.get('convert_client_info_bot'), mssg)
             return Response(response, status=response.get('httpstatus'))
 
 
@@ -177,17 +198,9 @@ class RegisterView(APIView):
                 "Content-Type": "application/json",
                 "Accept": "application/json",
             }
-            register_payload = {
-                "email":__data.get('email'),
-                "password":__data.get('password'),
-                "firstName":__data.get('firstName'),
-                "lastName":__data.get('lastName'),
-                "telephone":__data.get('telephone'),
-                "telephonePrefix":__data.get('telephonePrefix'),
-                "countryIso":__data.get('countryIso'),
-                "languageIso":__data.get('languageIso'),
-            }
-            response_data = requests.post(CRM_REGISTER_URL, json=register_payload, headers=headers)
+
+            print("data --- ", __data)
+            response_data = requests.post(CRM_REGISTER_URL, json=__data, headers=headers)
             try:
                 res_json = response_data.json()
             except Exception:
@@ -207,6 +220,8 @@ class RegisterView(APIView):
                     if serializer.is_valid():
                         try:
                             serializer.save()
+                            mssg = error_response(__data.get('email'), __data.get('telephone'), "Registered Successfully!!!")
+                            teletram_ins.send_telegram_message(settings_data.get('convert_client_info_bot'), mssg)
                             print("Record updated successfully")
                         except Exception as save_exception:
                             print(f"Error saving record: {save_exception}")
@@ -228,6 +243,9 @@ class RegisterView(APIView):
             response["status"] = "error"
             response["reason"] = str(e)
             response["httpstatus"] = HTTP_400_BAD_REQUEST
+            __data = request.data.get('data')  
+            mssg = error_response(__data.get('email'), __data.get('telephone'), str(e))
+            teletram_ins.send_telegram_message(settings_data.get('convert_client_info_bot'), mssg)
             return JsonResponse(response, status=response['httpstatus'])
 
 class CheckEmail(APIView):
@@ -326,7 +344,6 @@ class ChangeRegulation(APIView):
         try:
             response = {"status": "success", "errorcode": "","reason": "", "result": "", "httpstatus": HTTP_200_OK}
             __data = request.data            
-            settings_data = json.loads(TELEGRAM_SETTINGS)
             ref_link = request.headers.get("Ref-Link", "")
 
             # print("HEADER UUID:", repr(clean_uuid))
