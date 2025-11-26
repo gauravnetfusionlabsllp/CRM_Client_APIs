@@ -141,7 +141,7 @@ class VerifyUserPhoneNumber(APIView):
                 return Response(response, status=response.get('httpstatus'))
             
             else:
-                saved_otp = cache.get(f"otp_{email}")
+                saved_otp = cache.get(f"otp_{email}", 0)
                 if int(saved_otp) == int(otp):
                     response['reason'] = "OTP Verified Successfully!!!!"
                     return Response(response, status=response.get('httpstatus'))
