@@ -4,6 +4,7 @@ import random
 from django.core.cache import cache
 from dotenv import load_dotenv
 load_dotenv()
+import json
 
 from datetime import date
 
@@ -74,11 +75,37 @@ def verify_otp(phoneNo, otp, isCall):
 
 
 
+OTP_FILE = "otp_store.json"
+
+
+def load_otp_store():
+    """Load JSON file or return empty dict if file does not exist."""
+    if not os.path.exists(OTP_FILE):
+        return {}
+    with open(OTP_FILE, "r") as f:
+        return json.load(f)
+
+
+def save_otp_store(data):
+    """Save OTP dictionary back to OTP file."""
+    with open(OTP_FILE, "w") as f:
+        json.dump(data, f, indent=4)
+
+
 def generate_and_send_otp(email):
     try:
         otp = str(random.randint(100000, 999999))  # 6-digit OTP
-        cache.delete(f"otp_{email}")
-        cache.set(f"otp_{email}", otp, timeout=600)  # Store for 5 mins
+        # cache.clear(f"otp_{email}")
+        # cache.set(f"otp_{email}", otp, timeout=600)  # Store for 5 mins
+
+        # Load the JSON file
+        otp_data = load_otp_store()
+
+        # Update OTP for this email
+        otp_data[email] = otp
+
+        # Save updated OTPs
+        save_otp_store(otp_data)
         
         msg = EmailMessage()
         msg['Subject'] = 'Your OTP Code'
@@ -154,3 +181,8 @@ def generate_and_send_otp(email):
     except Exception as e:
         print(f"Error in the Generating and Sending OTP: {str(e)}")
         return False
+    
+def get_saved_otp(email):
+    """Retrieve OTP for an email."""
+    otp_data = load_otp_store()
+    return otp_data.get(email)

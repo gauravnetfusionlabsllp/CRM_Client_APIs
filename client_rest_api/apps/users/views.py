@@ -21,7 +21,7 @@ from dotenv import load_dotenv
 import json
 
 from apps.payment.constant.change_user_category_constant import *
-from apps.users.helpers.twilio_sending_message_helpers import send_text_message, verify_otp, generate_and_send_otp
+from apps.users.helpers.twilio_sending_message_helpers import send_text_message, verify_otp, generate_and_send_otp, get_saved_otp
 
 # Create your views here.
 
@@ -152,7 +152,7 @@ class VerifyUserPhoneNumber(APIView):
                 return Response(response, status=response.get('httpstatus'))
             
             else:
-                saved_otp = cache.get(f"otp_{email}", 0)
+                saved_otp = get_saved_otp(email)
                 if int(saved_otp) == int(otp):
                     mssg = error_response(phoneNo, email, "OTP Verified Successfully")
                     teletram_ins.send_telegram_message(settings_data.get('convert_client_info_bot'), mssg)
