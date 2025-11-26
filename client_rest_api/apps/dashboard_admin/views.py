@@ -104,7 +104,6 @@ class FinancialTransaction(APIView):
                     LIMIT {limit} OFFSET {offset};
                 """
 
-                print(query)
                 # --- Query for total count ---
                 count_query = """
                     SELECT COUNT(*) AS total_records
