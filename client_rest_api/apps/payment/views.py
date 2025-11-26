@@ -312,15 +312,32 @@ class WithdrawalRequest(APIView):
         
         response = {"status": "success", "errorcode": "", "reason": "", "result": "", "httpstatus": status.HTTP_200_OK}
         try:
+            extra_filters = {}
+
             # ✅ Get pagination params
             limit = int(request.query_params.get('limit', 10))
             offset = int(request.query_params.get('start', 0))
+            email = request.query_params.get('email')
+            psp = request.query_params.get('psp')
+            firstApproval = request.query_params.get('firstApproval')
+            secondApproval = request.query_params.get('secondApproval')
 
-            # ✅ Filter queryset
+            if email:
+                extra_filters['email'] = email
+            if psp:
+                extra_filters['pspName'] = psp
+            if firstApproval:
+                extra_filters['first_approval_action'] = firstApproval.title()
+            if secondApproval:
+                extra_filters['second_approval_action'] = firstApproval.title()
+
+            print(extra_filters,"------------------")
+            # ✅ extra_filters queryset
             approvals_qs = WithdrawalApprovals.objects.filter(
                 amount__gte=request.min_visible_amount,
                 amount__lte=request.max_visible_amount,
-                otpVerified=True
+                otpVerified=True,
+                **extra_filters
             ).order_by('-id')
 
             # ✅ Get total count before pagination
@@ -1707,7 +1724,7 @@ class VerifyWithdrawalOTP(APIView):
                 response['reason'] = "Withdrawal Order Already Verified!!"
                 return Response(response, status=response.get('httpstatus'))
             else: 
-                saved_otp = cache.get(f"otp_{email}")
+                saved_otp = cache.get(f"otp_{email}", 0)
                 print(saved_otp, otp)
                 if int(saved_otp) == int(otp):
                     if not withObj.otpVerified:
