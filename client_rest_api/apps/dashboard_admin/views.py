@@ -49,7 +49,7 @@ class FinancialTransaction(APIView):
                 if email:
                     extra_filters['u.email'] = str(email)
                 if paymentMethod:
-                    extra_filters['bb.transaction_method'] = paymentMethod
+                    extra_filters['bb.psp_name'] = paymentMethod
                 if payStatus:
                     extra_filters['bb.status'] = payStatus
                 if sd and ed:
@@ -103,6 +103,8 @@ class FinancialTransaction(APIView):
                     ORDER BY bb.id DESC
                     LIMIT {limit} OFFSET {offset};
                 """
+
+                print(query)
                 # --- Query for total count ---
                 count_query = """
                     SELECT COUNT(*) AS total_records
