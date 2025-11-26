@@ -53,7 +53,7 @@ from django.utils import timezone
 from .utils.decorators import check_user_permissions
 from .services.crm_apis import CRM
 
-from apps.users.helpers.twilio_sending_message_helpers import send_text_message, verify_otp, generate_and_send_otp
+from apps.users.helpers.twilio_sending_message_helpers import get_saved_otp, send_text_message, verify_otp, generate_and_send_otp
 
 
 from apps.payment.constant.change_user_category_constant import check_and_update_user_category
@@ -1724,7 +1724,7 @@ class VerifyWithdrawalOTP(APIView):
                 response['reason'] = "Withdrawal Order Already Verified!!"
                 return Response(response, status=response.get('httpstatus'))
             else: 
-                saved_otp = cache.get(f"otp_{email}", 0)
+                saved_otp = get_saved_otp(email)
                 print(saved_otp, otp)
                 if int(saved_otp) == int(otp):
                     if not withObj.otpVerified:
