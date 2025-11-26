@@ -41,6 +41,16 @@ def create_client_message(data):
     )
     return msg
 
+
+def error_response(phoneNo, email, msg):
+    msg = (
+        f"*Phone No:* {phoneNo}\n"
+        f"*Email:* {email}\n"
+        f"*ERROR:* {msg}!!!!\n"
+    )
+    return msg
+
+
 def register_client_message(old_data, new_data):
     # assume all records belong to same client
     first = old_data[0]
