@@ -338,7 +338,7 @@ class WithdrawalRequest(APIView):
                 amount__lte=request.max_visible_amount,
                 otpVerified=True,
                 **extra_filters
-            ).order_by('-id')
+            ).exclude(pspName="manualpayment").order_by('-id')
 
             # ✅ Get total count before pagination
             total_records = approvals_qs.count()
