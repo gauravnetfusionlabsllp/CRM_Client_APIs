@@ -41,6 +41,7 @@ class FinancialTransaction(APIView):
                 email = __data.get('email')
                 paymentMethod = __data.get('payMethod')
                 payStatus = __data.get('payStatus')
+                payType = __data.get('payType')
                 sd = __data.get('sd')
                 ed = __data.get('ed')
 
@@ -52,6 +53,8 @@ class FinancialTransaction(APIView):
                     extra_filters['bb.psp_name'] = paymentMethod
                 if payStatus:
                     extra_filters['bb.status'] = payStatus
+                if payType:
+                    extra_filters['bb.type'] = payType
                 if sd and ed:
                     extra_filters['bb.last_update_time_range'] = (sd, ed)
                 
@@ -92,6 +95,7 @@ class FinancialTransaction(APIView):
                         bb.ip,
                         bu.username,
                         bb.last_update_time,
+                        bb.type,
                         bb.*
                     FROM broker_banking bb
                     LEFT JOIN users u 
