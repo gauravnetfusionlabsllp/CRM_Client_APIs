@@ -36,14 +36,56 @@ class FinancialTransaction(APIView):
         try:
             __data = request.data.get('data')
             if __data:
-                print(__data)
                 limit = int(__data.get('limit', 10))
                 offset = int(__data.get('start', 0))
+                email = __data.get('email')
+                paymentMethod = __data.get('payMethod')
+                payStatus = __data.get('payStatus')
+                sd = __data.get('sd')
+                ed = __data.get('ed')
+
+                extra_filters = {}
+
+                if email:
+                    extra_filters['u.email'] = str(email)
+                if paymentMethod:
+                    extra_filters['bb.transaction_method'] = paymentMethod
+                if payStatus:
+                    extra_filters['bb.status'] = payStatus
+                if sd and ed:
+                    extra_filters['bb.last_update_time_range'] = (sd, ed)
+                
+
+                conditions = []
+
+                for key, value in extra_filters.items():
+                    if key.endswith("_range"):
+                        col = key.replace("_range", "")
+                        start, end = value
+
+                        if isinstance(start, str):
+                            start = f"'{start}'"
+                        if isinstance(end, str):
+                            end = f"'{end}'"
+
+                        conditions.append(f"{col} BETWEEN {start} AND {end}")
+
+                    else:
+                        # existing logic
+                        if isinstance(value, str):
+                            value = f"'{value}'"
+                        conditions.append(f"{key} = {value}")
+                
+                where_clause = ""
+                if conditions:
+                    where_clause = "WHERE " + " AND ".join(conditions)
+
 
                 # --- Query for paginated data ---
                 query = f"""
                     SELECT
                         u.first_name,
+                        u.email,
                         u.last_name,
                         bb.amount,
                         bu.external_id,
@@ -57,10 +99,10 @@ class FinancialTransaction(APIView):
                     LEFT JOIN broker_user bu 
                         ON bu.id = bb.broker_user_id 
                         AND bu.user_id = u.id
+                    {where_clause}
                     ORDER BY bb.id DESC
                     LIMIT {limit} OFFSET {offset};
                 """
-
                 # --- Query for total count ---
                 count_query = """
                     SELECT COUNT(*) AS total_records
