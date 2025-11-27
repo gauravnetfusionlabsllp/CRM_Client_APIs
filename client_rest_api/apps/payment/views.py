@@ -61,7 +61,7 @@ from apps.payment.services.psp_mat2pay_methods import payment_getway
 from apps.payment.constant.change_user_category_constant import *
 from apps.users.helpers.twilio_sending_message_helpers import send_text_message, verify_otp
 
-
+from django.db.models import Q
 
 # ---------------Jena Pay--------------------------
 
@@ -313,7 +313,7 @@ class WithdrawalRequest(APIView):
         response = {"status": "success", "errorcode": "", "reason": "", "result": "", "httpstatus": status.HTTP_200_OK}
         try:
             extra_filters = {}
-
+            query = Q()
             # ✅ Get pagination params
             limit = int(request.query_params.get('limit', 10))
             offset = int(request.query_params.get('start', 0))
@@ -321,19 +321,33 @@ class WithdrawalRequest(APIView):
             psp = request.query_params.get('psp')
             firstApproval = request.query_params.get('firstApproval')
             secondApproval = request.query_params.get('secondApproval')
+            sd = request.query_params.get('sd')
+            ed = request.query_params.get('ed')
 
             if email:
-                extra_filters['email'] = email
+                query &= Q(email__icontains=email)
             if psp:
                 extra_filters['pspName'] = psp
             if firstApproval:
                 extra_filters['first_approval_action'] = firstApproval.title()
             if secondApproval:
                 extra_filters['second_approval_action'] = firstApproval.title()
+            if sd and ed:
+                sd_dt = datetime.strptime(sd, "%Y-%m-%d")
+                ed_dt = datetime.strptime(ed, "%Y-%m-%d")
+
+                # Make them timezone-aware
+                sd_dt = timezone.make_aware(sd_dt)
+                ed_dt = timezone.make_aware(ed_dt)
+
+                # Apply filter
+                query &= Q(created_at__gte=sd_dt) & Q(created_at__lte=ed_dt)
+            
 
             print(extra_filters,"------------------")
             # ✅ extra_filters queryset
             approvals_qs = WithdrawalApprovals.objects.filter(
+                query,
                 amount__gte=request.min_visible_amount,
                 amount__lte=request.max_visible_amount,
                 otpVerified=True,

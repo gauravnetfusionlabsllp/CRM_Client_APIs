@@ -40,8 +40,8 @@ class FinancialTransaction(APIView):
                 offset = int(__data.get('start', 0))
                 email = __data.get('email')
                 paymentMethod = __data.get('payMethod')
-                payStatus = __data.get('payStatus')
-                payType = __data.get('payType')
+                payStatus = str(__data.get('payStatus'))
+                payType = str(__data.get('payType'))
                 sd = __data.get('sd')
                 ed = __data.get('ed')
 
@@ -73,6 +73,11 @@ class FinancialTransaction(APIView):
 
                         conditions.append(f"{col} BETWEEN {start} AND {end}")
 
+                    elif key == "u.email":
+                        if isinstance(value, str):
+                            safe_value = value.replace("'", "''")
+                            conditions.append(f"u.email LIKE '%{safe_value}%'")
+
                     else:
                         # existing logic
                         if isinstance(value, str):
@@ -96,6 +101,7 @@ class FinancialTransaction(APIView):
                         bu.username,
                         bb.last_update_time,
                         bb.type,
+                        bb.status,
                         bb.*
                     FROM broker_banking bb
                     LEFT JOIN users u 
@@ -134,9 +140,9 @@ class FinancialTransaction(APIView):
                         "offset": offset
                     }
                 else:
-                    response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                    response['errorcode'] = status.HTTP_200_OK
                     response['httpstatus'] = response['errorcode']
-                    response['reason'] = "DATA not found!"
+                    response['result'] = []
                     response['status'] = "error"
                     return JsonResponse(response, status=response.get('httpstatus'))
 

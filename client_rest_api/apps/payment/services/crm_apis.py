@@ -95,7 +95,7 @@ class CRM:
         payload = {
             "brokerBankingId": withdrawalID,
             "method": method,
-            "comment": "Testing",
+            "comment": "Approved",
             "pspTransactionId": transactionId,
             "pspId": pspId,
             "decisionTime": int(datetime.now().timestamp() * 1000)

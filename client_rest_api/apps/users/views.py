@@ -143,7 +143,6 @@ class VerifyUserPhoneNumber(APIView):
                 response['httpstatus'] = status.HTTP_400_BAD_REQUEST
                 return Response(response, status=response.get('httpstatus'))
             
-            print("================01", cache.get(f"otp_{email}"))
             res = verify_otp(phoneNo, otp, isCall)
             if res:
                 mssg = error_response(phoneNo, email, "OTP Verified Successfully")
