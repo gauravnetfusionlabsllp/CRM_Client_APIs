@@ -429,6 +429,41 @@ class GenerateWPLink(APIView):
             response["reason"] = str(e)
             response["httpstatus"] = HTTP_400_BAD_REQUEST
             return JsonResponse(response, status=response['httpstatus'])
+
+
+class VisitView(APIView):
+    def get(self, request):
+        try:
+            response = {"status": "success", "errorcode": "","reason": "", "result": "", "httpstatus": HTTP_200_OK}
+            affid = request.GET.get("affid")
+            p6 = request.GET.get("p6")   
+
+            
+            query =f"""
+                select v.creation_time, v.id from affiliate a left join visit v on a.id=v.affiliate_id where a.external_id ={affid} order by creation_time desc limit 1
+            """
+            print("query", query)
+
+            data = DBConnection._forFetchingJson(query, using='replica')
+            print("data", data)
+             
+            
+            if not data or len(data) == 0:
+                response["status"] = "error"
+                response["reason"] = "No visitor found!!"
+                response["httpstatus"] = 404
+            else:
+                response['httpstatus'] = HTTP_200_OK
+                response['status'] = "success"
+                response['result'] = data[0].get("id")   
+
+            
+            return JsonResponse(response, status=response['httpstatus'])
+        except Exception as e:
+            response["status"] = "error"
+            response["reason"] = str(e)
+            response["httpstatus"] = 500
+            return JsonResponse(response, status=response['httpstatus'])
         
 
 
