@@ -44,3 +44,8 @@ dist/
 
 # Ignore all .dat files
 *.dat
+
+
+
+# Ingnore OTP Json
+**otp_store.json
