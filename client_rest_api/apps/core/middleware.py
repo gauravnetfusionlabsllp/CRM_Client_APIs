@@ -20,6 +20,7 @@ class DynamicUserTokenMiddleware:
             "/users/get-wp-verify-link/",
             "/users/phone-send-otp/",
             "/users/verify-phone-otp/",   
+            "/users/visit",   
         ]
 
     def __call__(self, request):
