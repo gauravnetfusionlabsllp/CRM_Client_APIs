@@ -152,6 +152,11 @@ class VerifyUserPhoneNumber(APIView):
                 return Response(response, status=response.get('httpstatus'))
             
             else:
+                # saved_otp = cache.get(f"otp_{email}")
+
+                # if not saved_otp:
+                #     return False, "OTP expired"
+                
                 saved_otp = get_saved_otp(email)
                 if int(saved_otp) == int(otp):
                     mssg = error_response(phoneNo, email, "OTP Verified Successfully")

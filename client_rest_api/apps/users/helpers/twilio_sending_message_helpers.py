@@ -96,16 +96,16 @@ def generate_and_send_otp(email):
     try:
         otp = str(random.randint(100000, 999999))  # 6-digit OTP
         # cache.clear(f"otp_{email}")
-        # cache.set(f"otp_{email}", otp, timeout=600)  # Store for 5 mins
+        cache.set(f"otp_{email}", otp, timeout=600)  # Store for 5 mins
 
         # Load the JSON file
-        otp_data = load_otp_store()
+        # otp_data = load_otp_store()
 
         # Update OTP for this email
-        otp_data[email] = otp
+        # otp_data[email] = otp
 
         # Save updated OTPs
-        save_otp_store(otp_data)
+        # save_otp_store(otp_data)
         
         msg = EmailMessage()
         msg['Subject'] = 'Your OTP Code'
