@@ -152,6 +152,15 @@ class VerifyUserPhoneNumber(APIView):
             
             else:
                 saved_otp = get_saved_otp(email)
+
+                if not saved_otp:
+                    response['reason'] = "Failed to Verify OTP!!!!"
+                    response['status'] = 'error'
+                    response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                    response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                    return Response(response, status=response.get('httpstatus'))
+
+
                 if int(saved_otp) == int(otp):
                     mssg = error_response(phoneNo, email, "OTP Verified Successfully")
                     teletram_ins.send_telegram_message(settings_data.get('convert_client_info_bot'), mssg)
