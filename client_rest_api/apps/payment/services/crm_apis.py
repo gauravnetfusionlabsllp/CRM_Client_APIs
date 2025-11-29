@@ -57,7 +57,7 @@ class CRM:
             "fee": 0,
             "withdrawalSubType": 1,
             "comment": "Manual bank withdrawal",
-            "commentForUser": "Your withdrawal is being processed",
+            "commentForUser": "W",
             "pspId": 13 if data.get('pspName') == 'match2pay' else 11,
             "status": "PendingManualApproval",
             "normalizedAmount": final_amount,

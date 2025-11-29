@@ -248,7 +248,7 @@ class Match2PayPayIn(APIView):
                                         "amount": int(amount)*100,
                                         "method": "Crypto",
                                         "comment": "Deposit for Trading Account",
-                                        "commentForUser": "Deposit for Trading Account",
+                                        "commentForUser": "D",
                                         "pspId": 13 if request.registration_app == 2 else 16,
                                         "pspTransactionId": response_data.json().get("paymentId"),
                                         "status": "Pending",
@@ -508,7 +508,16 @@ class WithdrawalRequest(APIView):
 
                 # ✅ Stage 1 (auto-detected)
                 if approval.first_approval_by is None:
+                    
+                    query =f"""
+                        SELECT u.full_name FROM crmdb.users AS u where u.id = {user_id}
+                    """
+
+                    data = DBConnection._forFetchingJson(query, using='replica')
+                    data = data[0].get('full_name', "None")
+
                     approval.first_approval_by = user_id
+                    approval.first_approval_name = data if data else "None"
                     approval.first_approval_action = action
                     approval.first_approval_note = note
                     approval.first_approval_at = timezone.now()
@@ -546,7 +555,15 @@ class WithdrawalRequest(APIView):
                     return Response(response, status=400)
                     
                 if approval.second_approval_by is None:
+                    query =f"""
+                        SELECT u.full_name FROM crmdb.users AS u where u.id = {user_id}
+                    """
+
+                    data = DBConnection._forFetchingJson(query, using='replica')
+                    data = data[0].get('full_name', "None")
+
                     approval.second_approval_by = user_id
+                    approval.second_approval_name = data if data else "None"
                     approval.second_approval_action = action
                     approval.second_approval_note = note
                     approval.second_approval_at = timezone.now()
@@ -921,7 +938,7 @@ class JenaPayPayIn(APIView):
                 "amount": int(float(amount))*100,
                 "method": 19,
                 "comment": "Deposit for Trading Account",
-                "commentForUser": "Deposit for Trading Account",
+                "commentForUser": "D",
                 "pspId": 15,
                 "pspTransactionId": order.get('number'),
                 "status": "Pending",
@@ -1119,7 +1136,7 @@ class CheezeePayUPIPayIN(APIView):
                 "amount": int(usdAmount * 100),
                 "method": 17,
                 "comment": "Deposit for Trading Account",
-                "commentForUser": "Deposit for Trading Account",
+                "commentForUser": "D",
                 "pspId": 11,
                 "pspTransactionId": payload.get('mchOrderNo'),
                 "status": "Pending",
