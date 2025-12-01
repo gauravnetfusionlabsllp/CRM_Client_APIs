@@ -354,6 +354,7 @@ class WithdrawalRequest(APIView):
                 amount__gte=request.min_visible_amount,
                 amount__lte=request.max_visible_amount,
                 otpVerified=True,
+                ordertransactionid__isnull=False,
                 **extra_filters
             ).exclude(pspName="manualpayment").order_by('-id')
 
