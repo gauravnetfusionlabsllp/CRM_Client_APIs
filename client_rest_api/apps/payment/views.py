@@ -89,7 +89,10 @@ connection = mysql.connector.connect(
     host= str(os.environ['CLIENT_DB_HOST']),
     user= str(os.environ['CLIENT_DB_USER']),
     password= str(os.environ['CLIENT_DB_PASSWORD']),
-    database= str(os.environ['CLIENT_DB_DATABASE'])
+    database= str(os.environ['CLIENT_DB_DATABASE']),
+    autocommit=True,
+    connection_timeout=30,
+    use_pure=True
 )
 
 CRM_PUT_USER = os.environ['CRM_PUT_USER']
@@ -248,7 +251,7 @@ class Match2PayPayIn(APIView):
                                         "amount": int(amount)*100,
                                         "method": "Crypto",
                                         "comment": "Deposit for Trading Account",
-                                        "commentForUser": "Deposit for Trading Account",
+                                        "commentForUser": "D",
                                         "pspId": 13 if request.registration_app == 2 else 16,
                                         "pspTransactionId": response_data.json().get("paymentId"),
                                         "status": "Pending",
@@ -508,7 +511,16 @@ class WithdrawalRequest(APIView):
 
                 # ✅ Stage 1 (auto-detected)
                 if approval.first_approval_by is None:
+                    
+                    query =f"""
+                        SELECT u.full_name FROM crmdb.users AS u where u.id = {user_id}
+                    """
+
+                    data = DBConnection._forFetchingJson(query, using='replica')
+                    data = data[0].get('full_name', "None")
+
                     approval.first_approval_by = user_id
+                    approval.first_approval_name = data if data else "None"
                     approval.first_approval_action = action
                     approval.first_approval_note = note
                     approval.first_approval_at = timezone.now()
@@ -546,7 +558,15 @@ class WithdrawalRequest(APIView):
                     return Response(response, status=400)
                     
                 if approval.second_approval_by is None:
+                    query =f"""
+                        SELECT u.full_name FROM crmdb.users AS u where u.id = {user_id}
+                    """
+
+                    data = DBConnection._forFetchingJson(query, using='replica')
+                    data = data[0].get('full_name', "None")
+
                     approval.second_approval_by = user_id
+                    approval.second_approval_name = data if data else "None"
                     approval.second_approval_action = action
                     approval.second_approval_note = note
                     approval.second_approval_at = timezone.now()
@@ -832,16 +852,15 @@ class JenaPayPayIn(APIView):
                 return Response(response, status=response.get('httpstatus'))
 
             user_id = request.session_user
-            cursor = connection.cursor(dictionary=True)
 
-            query = """
-                SELECT u.full_name, u.email, u.telephone, u.id FROM crmdb.users AS u where u.id = %s
+            query = f"""
+                SELECT u.full_name, u.email, u.telephone, u.id FROM crmdb.users AS u where u.id = {user_id}
             """
 
-            params = (str(user_id),)
-            cursor.execute(query, params)
-            userData = cursor.fetchone()
-
+            data = DBConnection._forFetchingJson(query, using='replica')
+            userData = data[0]
+            print(userData,"----------------------------150")
+            
             if not userData:
                 response['status'] = 'error'
                 response['errorcode'] = status.HTTP_401_UNAUTHORIZED
@@ -921,7 +940,7 @@ class JenaPayPayIn(APIView):
                 "amount": int(float(amount))*100,
                 "method": 19,
                 "comment": "Deposit for Trading Account",
-                "commentForUser": "Deposit for Trading Account",
+                "commentForUser": "D",
                 "pspId": 15,
                 "pspTransactionId": order.get('number'),
                 "status": "Pending",
@@ -1059,6 +1078,7 @@ class CheezeePayUPIPayIN(APIView):
 
             # Fetch user data asynchronously
             userData = await self.get_user_data(user_id)
+            print(userData,"-----------------------------160")
             if not userData:
                 response.update({
                     "status": "error",
@@ -1119,7 +1139,7 @@ class CheezeePayUPIPayIN(APIView):
                 "amount": int(usdAmount * 100),
                 "method": 17,
                 "comment": "Deposit for Trading Account",
-                "commentForUser": "Deposit for Trading Account",
+                "commentForUser": "D",
                 "pspId": 11,
                 "pspTransactionId": payload.get('mchOrderNo'),
                 "status": "Pending",
@@ -1164,13 +1184,13 @@ class CheezeePayUPIPayIN(APIView):
         """Fetch user data asynchronously."""
         @sync_to_async
         def fetch():
-            with connection.cursor(dictionary=True) as cursor:
-                query = """
-                    SELECT u.full_name, u.email, u.telephone, u.id
-                    FROM crmdb.users AS u WHERE u.id = %s
-                """
-                cursor.execute(query, (str(user_id),))
-                return cursor.fetchone()
+            query = f"""
+            SELECT u.full_name, u.email, u.telephone, u.id 
+            FROM crmdb.users AS u 
+            WHERE u.id = {user_id}
+            """
+            data = DBConnection._forFetchingJson(query, using='replica')
+            return data[0] if data else None
 
         return await fetch()
 
