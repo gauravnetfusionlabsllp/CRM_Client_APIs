@@ -89,7 +89,10 @@ connection = mysql.connector.connect(
     host= str(os.environ['CLIENT_DB_HOST']),
     user= str(os.environ['CLIENT_DB_USER']),
     password= str(os.environ['CLIENT_DB_PASSWORD']),
-    database= str(os.environ['CLIENT_DB_DATABASE'])
+    database= str(os.environ['CLIENT_DB_DATABASE']),
+    autocommit=True,
+    connection_timeout=30,
+    use_pure=True
 )
 
 CRM_PUT_USER = os.environ['CRM_PUT_USER']
@@ -849,16 +852,15 @@ class JenaPayPayIn(APIView):
                 return Response(response, status=response.get('httpstatus'))
 
             user_id = request.session_user
-            cursor = connection.cursor(dictionary=True)
 
-            query = """
-                SELECT u.full_name, u.email, u.telephone, u.id FROM crmdb.users AS u where u.id = %s
+            query = f"""
+                SELECT u.full_name, u.email, u.telephone, u.id FROM crmdb.users AS u where u.id = {user_id}
             """
 
-            params = (str(user_id),)
-            cursor.execute(query, params)
-            userData = cursor.fetchone()
-
+            data = DBConnection._forFetchingJson(query, using='replica')
+            userData = data[0]
+            print(userData,"----------------------------150")
+            
             if not userData:
                 response['status'] = 'error'
                 response['errorcode'] = status.HTTP_401_UNAUTHORIZED
@@ -1076,6 +1078,7 @@ class CheezeePayUPIPayIN(APIView):
 
             # Fetch user data asynchronously
             userData = await self.get_user_data(user_id)
+            print(userData,"-----------------------------160")
             if not userData:
                 response.update({
                     "status": "error",
@@ -1181,13 +1184,13 @@ class CheezeePayUPIPayIN(APIView):
         """Fetch user data asynchronously."""
         @sync_to_async
         def fetch():
-            with connection.cursor(dictionary=True) as cursor:
-                query = """
-                    SELECT u.full_name, u.email, u.telephone, u.id
-                    FROM crmdb.users AS u WHERE u.id = %s
-                """
-                cursor.execute(query, (str(user_id),))
-                return cursor.fetchone()
+            query = f"""
+            SELECT u.full_name, u.email, u.telephone, u.id 
+            FROM crmdb.users AS u 
+            WHERE u.id = {user_id}
+            """
+            data = DBConnection._forFetchingJson(query, using='replica')
+            return data[0] if data else None
 
         return await fetch()
 
