@@ -9,6 +9,9 @@ from rest_framework import status
 from apps.payment.utils.decorators import check_user_permissions
 from apps.payment.services.crm_apis import CRM
 from apps.core.DBConnection import *
+from rest_framework.response import Response
+
+from apps.dashboard_admin.models import PSPRateUpdate
 
 class FinancialTransaction(APIView):
     def get(self, request):
@@ -157,4 +160,105 @@ class FinancialTransaction(APIView):
             response["httpstatus"] = status.HTTP_500_INTERNAL_SERVER_ERROR
             return JsonResponse(response, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        
+
+class UpdatePSPRate(APIView):
+
+    def post(self, request):
+        try:
+            response = {"status":"success", "errorcode":"", "reason":"", "result":"", "httpstatus": status.HTTP_200_OK}
+
+            depositRate = request.query_params.get('depositRate')
+            withdrawalRate = request.query_params.get('withdrawalRate')
+
+            if not all([depositRate, withdrawalRate]):
+                response['status'] = 'error'
+                response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                response['reason'] = "Deposit and Withdrawal Rate is required!!!"
+                response["httpstatus"] = status.HTTP_400_BAD_REQUEST
+                return Response(response, status=response.get('httpstatus'))
+            
+            user_id = request.session_user
+
+            if not user_id:
+                response['status'] = 'error'
+                response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                response['reason'] = "User Not Found!!!"
+                response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                return Response(response, status=response.get('httpstatus'))
+            
+            query =f"""
+                        SELECT u.full_name, u.email FROM crmdb.users AS u where u.id = {user_id}
+                    """
+            
+            data = DBConnection._forFetchingJson(query, using='replica')
+            if not data:
+                response['status'] = 'error'
+                response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                response['reason'] = "Unable to fetch user details from the MySQL Database!!"
+                response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                return Response(response, status=response.get('httpstatus'))
+            
+            full_name = data[0].get('full_name', "None")
+            email = data[0].get('email', "None")
+
+            rec = PSPRateUpdate.objects.first()
+
+            if rec:
+                rec.updated_by = full_name
+                rec.email = email
+                rec.userId = str(user_id)
+                rec.depositRate = depositRate
+                rec.withdrawalRate = withdrawalRate
+                rec.save()
+            else:
+                rec = PSPRateUpdate.objects.create(
+                    updated_by=full_name,
+                    email=email,
+                    userId=str(user_id),
+                    depositRate=depositRate,
+                    withdrawalRate=withdrawalRate
+                )
+
+            response['reason'] = 'Deposit and Withdrawal rate updated Successfully!!!'
+            response['result'] = {
+                "depositRate": rec.depositRate,
+                "withdrawalRate": rec.withdrawalRate,
+                "updateBy": rec.updated_by
+            }
+            return Response(response, status=response.get('httpstatus'))
+
+        except Exception as e:
+            print(f"Error in Updating the PSP Rate: {str(e)}")
+            response['status'] = 'error'
+            response['errorcode'] = status.HTTP_400_BAD_REQUEST
+            response['reason'] = str(e)
+            response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+            return Response(response, status=response.get('httpstatus'))
+
+    def get(self, request):
+        try:
+            response = {"status":"success", "errorcode":"", "reason":"", "result":"", "httpstatus": status.HTTP_200_OK}
+
+            rec = PSPRateUpdate.objects.all()
+
+            if not rec.exists():
+                response['status'] = 'error'
+                response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                response['reason'] = "No Record Found!!!"
+                response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                return Response(response, status=response.get('httpstatus'))
+
+            response['result'] = {
+                "update_by": rec[0].updated_by,
+                "email" : rec[0].email,
+                "depositRate": rec[0].depositRate,
+                "withdrawalRate": rec[0].withdrawalRate
+            }
+            return Response(response, status=response.get('httpstatus'))
+
+        except Exception as e:
+            response['status'] = 'error'
+            response['errorcode'] = status.HTTP_400_BAD_REQUEST
+            response['reason'] = str(e)
+            response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+            return Response(response, status=response.get('httpstatus'))
