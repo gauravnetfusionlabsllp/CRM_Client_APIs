@@ -71,3 +71,22 @@ class BankingDetails(models.Model):
     class Meta:
         managed = True  # Django should create the table
         db_table = 'BankingDetails'  # use lowercase
+
+
+class PSPRateUpdate(TimeStampModel):
+    updated_by = models.CharField(max_length=150, null=True, blank=True)
+    email = models.CharField(max_length=150, null=True, blank=True)
+    userId = models.CharField(max_length=150, null=True, blank=True)
+    depositRate = models.CharField(max_length=150, null=True, blank=True)
+    withdrawalRate = models.CharField(max_length=150, null=True, blank=True)
+    pspName = models.CharField(max_length=150, null=True, blank=True, default="CheezePay")
+
+
+    def __str__(self):
+        return str(self.userId)
+    
+    class Meta:
+        verbose_name = "PSP Rate Updates"
+        verbose_name_plural = "PSP Rate Update"
+        db_table = "PSPRate"
+
