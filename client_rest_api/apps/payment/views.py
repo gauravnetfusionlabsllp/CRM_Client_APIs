@@ -113,6 +113,7 @@ MATCH2PAY_SUCCESS_URL = os.environ.get('MATCH2PAY_SUCCESS_URL')
 
 CRM_MANUAL_DEPOSIT_URL = os.environ.get('CRM_MANUAL_DEPOSIT_URL')
 CRM_MANUAL_DEPOSIT_APPROVE_URL = os.environ.get('CRM_MANUAL_DEPOSIT_APPROVE_URL')
+CRM_MANUAL_DEPOSIT_PUT_URL = os.environ.get('CRM_MANUAL_DEPOSIT_PUT_URL')
 CRM_AUTH_TOKEN = os.environ.get('CRM_AUTH_TOKEN')
 
 class Match2PayPayIn(APIView):
@@ -793,7 +794,8 @@ class Match2PayPayInWebHook(APIView):
             record = OrderDetails.objects.get(transactionId=payment_id)
             if record:
                 status_update = {
-                    "status": "SUCCESS"
+                    "status": "SUCCESS",
+                    "amount": final_amount
                 }
                 serializer = OrderDetailsSerializer(record, data=status_update, partial=True)
                 if serializer.is_valid():
@@ -817,10 +819,17 @@ class Match2PayPayInWebHook(APIView):
                     "x-crm-api-token": str(CRM_AUTH_TOKEN)
                 }
 
-                crmRes = requests.post(str(CRM_MANUAL_DEPOSIT_APPROVE_URL), json=payload, headers=header).json()
-                print(crmRes)
+                payload_update_amt = {
+                            "id":record.brokerBankingId,
+                            "amount": final_amount * 100,
+                            "pspTransactionId": str(payment_id)
+                            }
+
+                crmRes = requests.put(str(CRM_MANUAL_DEPOSIT_PUT_URL), json=payload_update_amt, headers=header).json()
                 if crmRes.get('success'):
-                    print("order suucess on aintilope============== ")
+                    crmRes = requests.post(str(CRM_MANUAL_DEPOSIT_APPROVE_URL), json=payload, headers=header).json()
+                    if crmRes.get('success'):
+                        print("order suucess on aintilope============== ")
             else:
                 print("No record found with the provided payment_id: ", payment_id)
                     
