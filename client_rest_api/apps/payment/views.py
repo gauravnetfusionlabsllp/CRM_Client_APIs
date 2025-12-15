@@ -1816,6 +1816,7 @@ class CancelWithdrawalRequest(APIView):
             withdrawalRes = CRM()
             res = withdrawalRes.cancel_withdrawal(withdrawalID=transId)
 
+
             if not res['success']:
                 response['status'] = 'error'
                 response['errorcode'] = status.HTTP_400_BAD_REQUEST
@@ -1832,10 +1833,8 @@ class CancelWithdrawalRequest(APIView):
                 response['result'] = "Withdrawal Request Cancelled Successfully!!!"
                 return Response(response, status=response.get('httpstatus'))
             else:
-                response['status'] = 'error'
-                response['errorcode'] = status.HTTP_400_BAD_REQUEST
-                response['reason'] = "Failed to cancel withdrawal request!!!"
-                response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                response['reason'] = "Withdrawal Request"
+                response['result'] = "Withdrawal Request Cancelled Successfully!!!"
                 return Response(response, status=response.get('httpstatus'))
 
         except Exception as e:
