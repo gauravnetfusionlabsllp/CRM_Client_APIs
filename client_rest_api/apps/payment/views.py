@@ -1769,7 +1769,13 @@ class VerifyWithdrawalOTP(APIView):
                 return Response(response, status=response.get('httpstatus'))
             else: 
                 saved_otp = get_saved_otp(email)
-                print(saved_otp, otp)
+                
+                if not saved_otp:
+                    response['reason'] = "Failed to Verify OTP!!!!"
+                    response['status'] = 'error'
+                    response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                    response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                    return Response(response, status=response.get('httpstatus'))
                 if int(saved_otp) == int(otp):
                     if not withObj.otpVerified:
                         withObj.otpVerified = True
