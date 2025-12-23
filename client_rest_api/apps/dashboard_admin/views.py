@@ -12,6 +12,15 @@ from apps.core.DBConnection import *
 from rest_framework.response import Response
 
 from apps.dashboard_admin.models import PSPRateUpdate
+import  os, json, requests
+from dotenv import load_dotenv
+load_dotenv()
+
+CRM_PUT_USER = os.environ['CRM_PUT_USER']
+CRM_AUTH_TOKEN = os.environ.get('CRM_AUTH_TOKEN')
+CRM_PUT_KYC = os.environ.get('CRM_PUT_KYC')
+TELEGRAM_SETTINGS = os.environ.get('TELEGRAM_SETTINGS')
+settings_data = json.loads(TELEGRAM_SETTINGS)
 
 class FinancialTransaction(APIView):
     def get(self, request):
@@ -262,3 +271,59 @@ class UpdatePSPRate(APIView):
             response['reason'] = str(e)
             response['httpstatus'] = status.HTTP_400_BAD_REQUEST
             return Response(response, status=response.get('httpstatus'))
+
+
+
+class KYCApprove(APIView):
+    def post(self, request):
+        response = {"status": "success", "errorcode": "","reason": "", "result": "", "httpstatus": status.HTTP_200_OK}
+        try:
+            user_id = request.session_user
+            payload = {
+                    "userId": user_id,
+                    "kycRep": 1,
+                    "kycStatus": 4,
+                    "fnsStatus": 1,
+                    "kycNote": "Approved via API",
+                    "kycWorkflowStatus": 1,
+                    "pepSanctions": 0,
+                    "originOfFunds": 1,
+                    "operatorId": 123,
+                    "kycIdVerificationStatus": 1,
+                    "kycPorVerificationStatus": 1,
+                    "kycAccountStatus": 1,
+                    "kycApprovalStatus": 1,
+                    "kycIdFrontVerificationStatus": 1,
+                    "kycIdBackVerificationStatus": 1,
+                    "kycIdPassportVerificationStatus": 1,
+                    "kycIdVisaVerificationStatus": 1,
+                    "pendingInvestigation": False,
+                    "taskRaised": False,
+                    "kycScore": 100,
+                    "kycLevel": 3,
+                    "isIbAgreementSigned": True,
+                    "userAgreementStatus": "Signed",
+                    "userAgreementSentDate": 1700000000,
+                    "userAgreementLastReminderDate": 1700000000,
+                    "userAgreementSignedDate": 1700000000,
+                    "showKycWarning": False,
+                    "showKycInfo": False,
+                    "isKycApproved": False,
+                    "hasKycRep": True
+                    }
+            headers = {
+                "Content-Type": "application/json",
+                "x-crm-api-token": str(CRM_AUTH_TOKEN)
+            }
+            resp = requests.put(CRM_PUT_KYC, json=payload, headers=headers).json()
+            response["status"] = "success"
+            response["message"] = "KYC Approved.."
+            response["httpstatus"] = status.HTTP_200_OK
+            return JsonResponse(response, status=response['httpstatus'])
+        except Exception as e:
+            response["status"] = "error"
+            response["reason"] = str(e)
+            response["httpstatus"] = status.HTTP_400_BAD_REQUEST
+            return JsonResponse(response, status=response['httpstatus'])
+
+
