@@ -1827,7 +1827,7 @@ class CancelWithdrawalRequest(APIView):
                 if withRes.first_approval_action:
                     response['status'] = "error"
                     response['errorcode'] = status.HTTP_400_BAD_REQUEST
-                    response['result'] = "Withdrawal Request Already Approved!!!"
+                    response['result'] = "Withdrawal Request is under process!!!"
                     response['httpstatus'] = status.HTTP_400_BAD_REQUEST
                     return Response(response, response.get('httpstatus'))
                 
@@ -1889,7 +1889,7 @@ class HideWithdarwalRequest(APIView):
                 if withRes.first_approval_action:
                     response['status'] = "error"
                     response['errorcode'] = status.HTTP_400_BAD_REQUEST
-                    response['result'] = "Withdrawal Request Already Approved!!!"
+                    response['result'] = "Withdrawal Request is under process!!!"
                     response['httpstatus'] = status.HTTP_400_BAD_REQUEST
                     return Response(response, response.get('httpstatus'))
                 
