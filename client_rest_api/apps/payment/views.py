@@ -1844,3 +1844,48 @@ class CancelWithdrawalRequest(APIView):
             response['reason'] = str(e)
             response['httpstatus'] = status.HTTP_400_BAD_REQUEST
             return Response(response, status=response.get('httpstatus'))
+
+
+class HideDeleteRequest(APIView):
+
+    def get(self, request):
+        try:
+            response = {"status":"success", "errorcode": "", "reason": "", "result": "", "httpstatus": status.HTTP_200_OK}
+
+            transId = request.query_params.get('transId')
+            
+            if not transId:
+                response['status'] = 'error'
+                response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                response['reason'] = "Transaction Id is required!!!"
+                response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                return Response(response, status=response.get('httpstatus'))
+            
+            order = OrderDetails.objects.filter(brokerBankingId=transId).first()
+
+            if order:
+                withRes = WithdrawalApprovals.objects.filter(ordertransactionid=order).first()
+
+                if withRes.first_approval_action:
+                    response['status'] = "error"
+                    response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                    response['result'] = "Withdrawal Request Already Approved!!!"
+                    response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                    return Response(response, response.get('httpstatus'))
+                
+                else:
+                    response['result'] = "Withdrawal request pending!!!"
+                    return Response(response, response.get('httpstatus'))
+                
+            else:
+                response['result'] = "No Order Found!!!"
+                return Response(response, status=response.get('httpstatus'))
+
+
+        except Exception as e:
+            print(f"Error in cancelling the Withdrawal Request: {str(e)}")
+            response['status'] = 'error'
+            response['errorcode'] = status.HTTP_400_BAD_REQUEST
+            response['reason'] = str(e)
+            response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+            return Response(response, status=response.get('httpstatus'))
