@@ -1813,25 +1813,38 @@ class CancelWithdrawalRequest(APIView):
                 response['httpstatus'] = status.HTTP_400_BAD_REQUEST
                 return Response(response, status=response.get('httpstatus'))
             
-            withdrawalRes = CRM()
-            res = withdrawalRes.cancel_withdrawal(withdrawalID=transId)
-
-
-            if not res['success']:
-                response['status'] = 'error'
-                response['errorcode'] = status.HTTP_400_BAD_REQUEST
-                response['reason'] = "Unable to cancel pending request!!!"
-                response['httpstatus'] = status.HTTP_400_BAD_REQUEST
-                return Response(response, status=response.get('httpstatus'))
-            
-
             order = OrderDetails.objects.filter(brokerBankingId=transId).first()
 
             if order:
-                WithdrawalApprovals.objects.filter(ordertransactionid=order).delete()
-                order.delete()
-                response['result'] = "Withdrawal Request Cancelled Successfully!!!"
-                return Response(response, status=response.get('httpstatus'))
+                withRes = WithdrawalApprovals.objects.filter(ordertransactionid=order).first()
+                if not withRes:
+                    response['status'] = 'error'
+                    response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                    response['reason'] = "Withdrawal Request Not Found!!!"
+                    response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                    return Response(response, status=response.get('httpstatus'))
+
+                if withRes.first_approval_action:
+                    response['status'] = "error"
+                    response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                    response['result'] = "Withdrawal Request Already Approved!!!"
+                    response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                    return Response(response, response.get('httpstatus'))
+                
+                else:
+                    withdrawalRes = CRM()
+                    res = withdrawalRes.cancel_withdrawal(withdrawalID=transId)
+                    if not res['success']:
+                        response['status'] = 'error'
+                        response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                        response['reason'] = "Unable to cancel pending request!!!"
+                        response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                        return Response(response, status=response.get('httpstatus'))
+                    else:
+                        WithdrawalApprovals.objects.filter(ordertransactionid=order).delete()
+                        order.delete()
+                        response['result'] = "Withdrawal Request Cancelled Successfully!!!"
+                        return Response(response, status=response.get('httpstatus'))
             else:
                 response['reason'] = "Withdrawal Request"
                 response['result'] = "Withdrawal Request Cancelled Successfully!!!"
@@ -1862,7 +1875,6 @@ class HideWithdarwalRequest(APIView):
                 return Response(response, status=response.get('httpstatus'))
             
             order = OrderDetails.objects.filter(brokerBankingId=transId).first()
-            print(order,"-------------------")
 
             if order:
                 withRes = WithdrawalApprovals.objects.filter(ordertransactionid=order).first()
