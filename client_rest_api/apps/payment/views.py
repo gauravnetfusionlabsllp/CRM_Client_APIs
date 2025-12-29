@@ -1846,7 +1846,7 @@ class CancelWithdrawalRequest(APIView):
             return Response(response, status=response.get('httpstatus'))
 
 
-class HideDeleteRequest(APIView):
+class HideWithdarwalRequest(APIView):
 
     def get(self, request):
         try:
@@ -1862,9 +1862,17 @@ class HideDeleteRequest(APIView):
                 return Response(response, status=response.get('httpstatus'))
             
             order = OrderDetails.objects.filter(brokerBankingId=transId).first()
+            print(order,"-------------------")
 
             if order:
                 withRes = WithdrawalApprovals.objects.filter(ordertransactionid=order).first()
+
+                if not withRes:
+                    response['status'] = 'error'
+                    response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                    response['reason'] = "Withdrawal Request Not Found!!!"
+                    response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                    return Response(response, status=response.get('httpstatus'))
 
                 if withRes.first_approval_action:
                     response['status'] = "error"
