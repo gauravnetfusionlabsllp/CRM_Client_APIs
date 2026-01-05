@@ -228,7 +228,7 @@ class RegisterView(APIView):
                     if serializer.is_valid():
                         try:
                             serializer.save()
-                            mssg = error_response(__data.get('email'), __data.get('telephone'), "Registered Successfully!!!")
+                            mssg = error_response(__data.get('telephone'), __data.get('email'), "Registered Successfully!!!")
                             teletram_ins.send_telegram_message(settings_data.get('convert_client_info_bot'), mssg)
                             print("Record updated successfully")
                         except Exception as save_exception:
