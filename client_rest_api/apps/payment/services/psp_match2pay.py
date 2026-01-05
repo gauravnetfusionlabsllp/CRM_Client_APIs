@@ -27,11 +27,6 @@ class Match2PayPSP:
         response = {"status": "success", "errorcode": "", "reason": "", "result":"", "httpstatus": status.HTTP_200_OK}
         try:
             __data = approval
-            print(__data.walletAddress)
-            print(__data.amount)
-            print(__data.userId)
-            print(__data.email)
-            print(__data.paymentMethod)
             query =f"""
                 SELECT
                 u.id, 
@@ -49,16 +44,23 @@ class Match2PayPSP:
                 u.id AS user_id
                 FROM crmdb.users AS u where u.id={__data.userId} and u.email='{__data.email}'
             """
+
             __user_data = DBConnection._forFetchingJson(query, using='replica')
             __user_data = __user_data[0]
+
+
+            trading_info_query =f"""
+                                select id, external_id, user_id from crmdb.broker_user where id={__data.brokerUserId}
+                                """
+            trading_info_data = DBConnection._forFetchingJson(trading_info_query, using='replica')
+            trading_info_data = trading_info_data[0]
+
             if __user_data.get('registration_app') == 2:
                 MATCH2PAY_PAY_API_TOKEN = MATCH2PAY_PAY_API_TOKEN_S
                 MATCH2PAY_API_SECRETE = MATCH2PAY_API_SECRETE_S
             else:
                 MATCH2PAY_PAY_API_TOKEN = MATCH2PAY_PAY_API_TOKEN_M
                 MATCH2PAY_API_SECRETE = MATCH2PAY_API_SECRETE_M
-            print("MATCH2PAY_PAY_API_TOKEN with: ", MATCH2PAY_PAY_API_TOKEN)
-            print("MATCH2PAY_API_SECRETE with: ", MATCH2PAY_API_SECRETE)
             request_body = {
                 "amount": int(__data.amount),
                 "apiToken": MATCH2PAY_PAY_API_TOKEN,
@@ -81,7 +83,7 @@ class Match2PayPSP:
                     },
                     "locale": "en_US",
                     "dateOfBirth": "1990-01-01",
-                    "tradingAccountLogin": "clientId_12345",
+                    "tradingAccountLogin": trading_info_data.get('external_id'),
                     "tradingAccountUuid": "clientUid_67890"
                 },
                 "failureUrl": MATCH2PAY_FAILURE_URL,
@@ -91,7 +93,6 @@ class Match2PayPSP:
                 "successUrl": MATCH2PAY_SUCCESS_URL,
                 "timestamp": "1764149779000"
             }
-            print("request body ===========> ", request_body)
             request_body["signature"] = generate_signature(request_body, MATCH2PAY_API_SECRETE)
             # Prepare headers
             headers = {
@@ -118,11 +119,8 @@ class Match2PayPSP:
             else:
                 print("⚠ PSP response missing paymentId:", data)
 
-
-            # ✅ Print response
-            print(response.status_code)
-            print(response.text)
             return data
+
         except Exception as e:
             print(str(e))
 

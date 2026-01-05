@@ -170,10 +170,8 @@ class Match2PayPayIn(APIView):
             trading_info_query =f"""
                                 select id, external_id, user_id from crmdb.broker_user where id={brokerUserId}
                                 """
-            print(trading_info_query)
             trading_info_data = DBConnection._forFetchingJson(trading_info_query, using='replica')
             trading_info_data = trading_info_data[0]
-            print(trading_info_data)
 
             payment_payload = {
                 "amount":amount_with_fees,
@@ -193,18 +191,14 @@ class Match2PayPayIn(APIView):
                             },
                             "locale":data.get('country_iso') if data.get('country_iso') else 'default',
                             "dateOfBirth": "04-05-2001",
-                            "tradingAccountLogin": trading_info_data.get('external_id') if data.get('external_id') else 'default',
+                            "tradingAccountLogin": trading_info_data.get('external_id'),
                             "tradingAccountUuid": data.get('id') if data.get('id') else 'default'
 
                         }
             }
-            print(payment_payload)
-
 
             # request_body = request.data.get('data')
             serializer = PaymentRequestSerializer(data=payment_payload)
-            print("MATCH2PAY_PAY_API_TOKEN: ", MATCH2PAY_PAY_API_TOKEN)
-            print("MATCH2PAY_API_SECRETE: ", MATCH2PAY_API_SECRETE)
             if serializer.is_valid():
                 # print(serializer.validated_data)
                 serialized_data = serializer.validated_data
@@ -224,7 +218,6 @@ class Match2PayPayIn(APIView):
                     headers=headers,
                     data=json.dumps(serialized_data)
                 )
-                print("response_data========>", response_data.json())
                 if response_data.json().get("status"):
                     try:
                         # data = response_data.json()
@@ -261,21 +254,16 @@ class Match2PayPayIn(APIView):
                                         "declineReason": "Manual",
                                         "brandExternalId": response_data.json().get("paymentId")
                                     }
-                            print('crm_payload: 02', crm_payload)
                             crmRes = requests.post(str(CRM_MANUAL_DEPOSIT_URL), json=crm_payload, headers=header).json()
-                            print("crmRes: 01", crmRes)
                             if crmRes['result']['success']:
                                 payload['brokerBankingId'] = str(crmRes['result']['result']['id'])
                                 payload['order_type'] = str("deposit")
-                                print(payload)
                                 serializer = OrderDetailsSerializer(data = payload)
                                 if serializer.is_valid():
                                     serializer.save()
-                                    print("order saved ================== 01")
                                 else:
                                     print("ERROR in saving data in OrderDetailsSerializer: ", str(serializer.errors))
 
-                                print("============== data hase been sent to the antilop =====================")
                             else:
                                 response['status'] = 'error'
                                 response['errorcode'] = status.HTTP_400_BAD_REQUEST
