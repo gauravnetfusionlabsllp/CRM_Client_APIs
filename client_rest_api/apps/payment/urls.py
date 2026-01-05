@@ -39,4 +39,6 @@ urlpatterns = [
 
    path('cancel-withdarawl-request/', views.CancelWithdrawalRequest.as_view(), name="cancel-withdarawl-request/"),
 
+   path('hide-withdrawal-request/', views.HideWithdarwalRequest.as_view(), name="hide-delete-request"),
+
 ]

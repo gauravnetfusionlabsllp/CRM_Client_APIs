@@ -56,7 +56,7 @@ class CRM:
             "method": "Crypto" if data.get('pspName') == 'match2pay' else "BonusProtectedPositionCashback",
             "fee": 0,
             "withdrawalSubType": 1,
-            "comment": "Manual bank withdrawal",
+            "comment": "Approved",
             "commentForUser": "W",
             "pspId": 13 if data.get('pspName') == 'match2pay' else 11,
             "status": "PendingManualApproval",
