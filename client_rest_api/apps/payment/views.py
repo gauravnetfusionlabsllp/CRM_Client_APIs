@@ -1126,7 +1126,7 @@ class CheezeePayUPIPayIN(APIView):
                 response.update({
                     "status": "error",
                     "errorcode": resp.get('code'),
-                    "reason": f"Order placement failed",
+                    "reason": f"Order placement failed try after some times!!!",
                     "httpstatus": status.HTTP_400_BAD_REQUEST
                 })
                 return Response(response, status=response["httpstatus"])
