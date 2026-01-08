@@ -10,6 +10,7 @@ CRM_AUTH_TOKEN = os.environ.get('CRM_AUTH_TOKEN')
 CRM_MANUAL_WITHDRAWAL_URL = os.environ.get('CRM_MANUAL_WITHDRAWAL_URL')
 CRM_MANUAL_WITHDRAWAL_APPROVE_URL = os.environ.get("CRM_MANUAL_WITHDRAWAL_APPROVE_URL")
 CRM_MANUAL_WITHDRAWAL_CANCEL_URL = os.environ.get("CRM_MANUAL_WITHDRAWAL_CANCEL_URL")
+CRM_MANUAL_WITHDRAWAL_UPDATE_URL = os.environ.get("CRM_MANUAL_WITHDRAWAL_UPDATE_URL")
 CRM_GET_TRANSACTIONS_URL = os.environ.get("CRM_GET_TRANSACTIONS_URL")
 
 headers = {
@@ -114,6 +115,23 @@ class CRM:
             print(f"Exception occurred: {e}")
             return {'success': False }
     
+
+    def update_crm_withdrawal(self, withdrawalID, pspTransactionId):
+        payload = {
+            "id": withdrawalID,
+            "pspTransactionId": str(pspTransactionId)
+        }
+        print("Payload", payload)
+
+        try:
+            response = requests.put(str(CRM_MANUAL_WITHDRAWAL_UPDATE_URL), json=payload ,headers=headers)
+            if response.status_code == 200:
+                return response.json()
+            else:
+                return {'success': False }
+        except Exception as e:
+            return {'success': False }
+        
     def cancel_withdrawal(self, withdrawalID):
         payload = {
                 "id": int(withdrawalID)

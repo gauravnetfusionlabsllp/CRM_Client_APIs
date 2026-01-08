@@ -535,8 +535,7 @@ class WithdrawalRequest(APIView):
                             psp_method = 17
                             psp_id = 11
                         
-                        crmRes = crm_api.verify_withdrawal(
-                                int(approval.brokerBankingId),
+                        crmRes = crm_api.verify_withdrawal(int(approval.brokerBankingId),
                                 method=psp_method,
                                 pspId=psp_id
                             )
@@ -741,17 +740,15 @@ class Match2PayPayOutWebHook(APIView):
             #     "decisionTime": int(time.time())
             # }
             # print(order.brokerBankingId)
-            # crmRes = crm_api.verify_withdrawal(
-            #     int(order.brokerBankingId),
-            #     method=8,
-            #     transactionId=str(payment_id),
-            #     pspId=13
-            # )
-            # print("crmRes: ", crmRes)
-            # if not crmRes.get("success"):
-            #     print("ERROR in verify_withdrawal Match2PayPayOutWebHook")
-            # else :
-            #     print("Withdrawal request hase been Successfully Completed On CRM!!")
+            crmRes = crm_api.update_crm_withdrawal(
+                int(order.brokerBankingId),
+                transactionId=str(payment_id),
+            )
+            print("crmRes: ", crmRes)
+            if not crmRes.get("success"):
+                logger.error(f"ERROR in verify_withdrawal Match2PayPayOutWebHook: {payment_id}", exc_info=True)
+            else :
+                logger.error(f"Withdrawal request hase been Successfully Completed On CRM!!: {payment_id}", exc_info=True)
 
             return JsonResponse({"status": "ok"})
         # -----------------------------
@@ -1319,14 +1316,11 @@ class CheezeePayOutWebhook(APIView):
             print(orderStatus,"------------------350")
 
             if orderData.status == "PENDING" and int(orderStatus) == 1:
-                # crmRes = crm_api.verify_withdrawal(
-                #     int(orderData.brokerBankingId),
-                #     method=17,
-                #     transactionId=str(mchOrderNo),
-                #     pspId=11
-                # )
-                # if crmRes.get('success'):
-                    # orderData.transactionId = str(platOrderNo)
+                crmRes = crm_api.update_crm_withdrawal(
+                    int(orderData.brokerBankingId),
+                    transactionId=str(mchOrderNo),
+                )
+                if crmRes.get('success'):
                     orderData.status = "SUCCESS"
                     # orderData.tradingId = str(crmRes['result']['brokerUserExternalId'])
                     orderData.save()
