@@ -535,8 +535,7 @@ class WithdrawalRequest(APIView):
                             psp_method = 17
                             psp_id = 11
                         
-                        crmRes = crm_api.verify_withdrawal(
-                                int(approval.brokerBankingId),
+                        crmRes = crm_api.verify_withdrawal(int(approval.brokerBankingId),
                                 method=psp_method,
                                 pspId=psp_id
                             )
@@ -1323,7 +1322,7 @@ class CheezeePayOutWebhook(APIView):
                 )
                 if crmRes.get('success'):
                     orderData.status = "SUCCESS"
-                    orderData.tradingId = str(crmRes['result']['brokerUserExternalId'])
+                    # orderData.tradingId = str(crmRes['result']['brokerUserExternalId'])
                     orderData.save()
                     # print("--------------------Successs")
                     logger.error(f"orderId: {orderId}, success", exc_info=True)

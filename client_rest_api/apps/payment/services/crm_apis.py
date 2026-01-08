@@ -119,12 +119,12 @@ class CRM:
     def update_crm_withdrawal(self, withdrawalID, pspTransactionId):
         payload = {
             "id": withdrawalID,
-            "pspTransactionId": pspTransactionId
+            "pspTransactionId": str(pspTransactionId)
         }
         print("Payload", payload)
 
         try:
-            response = requests.post(str(CRM_MANUAL_WITHDRAWAL_UPDATE_URL), json=payload ,headers=headers)
+            response = requests.put(str(CRM_MANUAL_WITHDRAWAL_UPDATE_URL), json=payload ,headers=headers)
             if response.status_code == 200:
                 return response.json()
             else:
