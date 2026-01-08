@@ -13,6 +13,9 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 import os
 
+from datetime import datetime, timedelta
+
+
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -188,3 +191,46 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+LOG_DIR = os.path.join(os.path.dirname(__file__), "error_logs")
+os.makedirs(LOG_DIR, exist_ok=True)
+
+# File naming by date
+today = datetime.now().strftime("%Y-%m-%d")
+yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+log_filename = os.path.join(LOG_DIR, f"{today}.log")
+
+# Clean up old log files (keep only today and yesterday)
+for filename in os.listdir(LOG_DIR):
+    if filename.endswith(".log") and not (
+        filename.startswith(today) or filename.startswith(yesterday)
+    ):
+        os.remove(os.path.join(LOG_DIR, filename))
+
+# Logger config
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'error_formatter': {
+            'format': '%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s',
+        },
+    },
+    'handlers': {
+        'error_file': {
+            'level': 'ERROR',
+            'class': 'logging.FileHandler',
+            'filename': log_filename,
+            'formatter': 'error_formatter',
+        },
+    },
+    'loggers': {
+        'custom_logger': {
+            'handlers': ['error_file'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+    },
+}
+
