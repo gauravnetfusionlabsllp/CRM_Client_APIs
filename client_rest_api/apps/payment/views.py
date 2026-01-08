@@ -529,11 +529,11 @@ class WithdrawalRequest(APIView):
                     response['errorcode'] = status.HTTP_200_OK
                     if action:
                         if str(approval.pspName).lower() == 'cheezepay':
-                            psp_method = 8
-                            psp_id = 13
-                        elif str(approval.pspName).lower() == 'match2pay':
                             psp_method = 17
                             psp_id = 11
+                        elif str(approval.pspName).lower() == 'match2pay':
+                            psp_method = 8
+                            psp_id = 13
                         
                         crmRes = crm_api.verify_withdrawal(int(approval.brokerBankingId),
                                 method=psp_method,
