@@ -742,7 +742,7 @@ class Match2PayPayOutWebHook(APIView):
             # print(order.brokerBankingId)
             crmRes = crm_api.update_crm_withdrawal(
                 int(order.brokerBankingId),
-                transactionId=str(payment_id),
+                str(payment_id),
             )
             print("crmRes: ", crmRes)
             if not crmRes.get("success"):
@@ -1318,7 +1318,7 @@ class CheezeePayOutWebhook(APIView):
             if orderData.status == "PENDING" and int(orderStatus) == 1:
                 crmRes = crm_api.update_crm_withdrawal(
                     int(orderData.brokerBankingId),
-                    transactionId=str(mchOrderNo),
+                    str(mchOrderNo),
                 )
                 if crmRes.get('success'):
                     orderData.status = "SUCCESS"
