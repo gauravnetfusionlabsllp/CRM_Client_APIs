@@ -116,6 +116,16 @@ CRM_MANUAL_DEPOSIT_APPROVE_URL = os.environ.get('CRM_MANUAL_DEPOSIT_APPROVE_URL'
 CRM_MANUAL_DEPOSIT_PUT_URL = os.environ.get('CRM_MANUAL_DEPOSIT_PUT_URL')
 CRM_AUTH_TOKEN = os.environ.get('CRM_AUTH_TOKEN')
 
+
+
+
+import logging
+import logging.config
+from django.conf import settings
+logging.config.dictConfig(settings.LOGGING)
+logger = logging.getLogger('custom_logger')
+
+
 class Match2PayPayIn(APIView):
     def post(self, request):
         response = {"status": "success", "errorcode": "", "reason": "", "result":"", "httpstatus": status.HTTP_200_OK}
@@ -518,6 +528,19 @@ class WithdrawalRequest(APIView):
 
                     response['errorcode'] = status.HTTP_200_OK
                     if action:
+                        if str(approval.pspName).lower() == 'cheezepay':
+                            psp_method = 8
+                            psp_id = 13
+                        elif str(approval.pspName).lower() == 'match2pay':
+                            psp_method = 17
+                            psp_id = 11
+                        
+                        crmRes = crm_api.verify_withdrawal(
+                                int(approval.brokerBankingId),
+                                method=psp_method,
+                                pspId=psp_id
+                            )
+
                         response['reason'] = str("Transaction approved.")
                     else:
                         crmRes = crm_api.cancel_withdrawal(approval.brokerBankingId)
@@ -702,33 +725,33 @@ class Match2PayPayOutWebHook(APIView):
                 try:
                     serializer.save()
                 except Exception as e:
-                    print("❌ Error saving order:", e)
+                    logger.error(f"❌ Error saving order: {e}", exc_info=True)
             else:
-                print("Serializer Errors:", serializer.errors)
+                logger.error(f"Serializer Errors: {serializer.errors}", exc_info=True)
 
             # -----------------------------
             # ✅ Notify CRM (Withdrawal Approve)
             # -----------------------------
-            payload = {
-                "brokerBankingId": int(order.brokerBankingId),
-                "method": "Crypto",
-                "comment": "Withdrawal Sent Successfully",
-                "pspTransactionId": str(payment_id),
-                "pspId": 12,
-                "decisionTime": int(time.time())
-            }
-            print(order.brokerBankingId)
-            crmRes = crm_api.verify_withdrawal(
-                int(order.brokerBankingId),
-                method=8,
-                transactionId=str(payment_id),
-                pspId=13
-            )
-            print("crmRes: ", crmRes)
-            if not crmRes.get("success"):
-                print("ERROR in verify_withdrawal Match2PayPayOutWebHook")
-            else :
-                print("Withdrawal request hase been Successfully Completed On CRM!!")
+            # payload = {
+            #     "brokerBankingId": int(order.brokerBankingId),
+            #     "method": "Crypto",
+            #     "comment": "Withdrawal Sent Successfully",
+            #     "pspTransactionId": str(payment_id),
+            #     "pspId": 12,
+            #     "decisionTime": int(time.time())
+            # }
+            # print(order.brokerBankingId)
+            # crmRes = crm_api.verify_withdrawal(
+            #     int(order.brokerBankingId),
+            #     method=8,
+            #     transactionId=str(payment_id),
+            #     pspId=13
+            # )
+            # print("crmRes: ", crmRes)
+            # if not crmRes.get("success"):
+            #     print("ERROR in verify_withdrawal Match2PayPayOutWebHook")
+            # else :
+            #     print("Withdrawal request hase been Successfully Completed On CRM!!")
 
             return JsonResponse({"status": "ok"})
         # -----------------------------
@@ -1296,25 +1319,26 @@ class CheezeePayOutWebhook(APIView):
             print(orderStatus,"------------------350")
 
             if orderData.status == "PENDING" and int(orderStatus) == 1:
-                crmRes = crm_api.verify_withdrawal(
-                    int(orderData.brokerBankingId),
-                    method=17,
-                    transactionId=str(mchOrderNo),
-                    pspId=11
-                )
-                if crmRes.get('success'):
-                    orderData.transactionId = str(platOrderNo)
+                # crmRes = crm_api.verify_withdrawal(
+                #     int(orderData.brokerBankingId),
+                #     method=17,
+                #     transactionId=str(mchOrderNo),
+                #     pspId=11
+                # )
+                # if crmRes.get('success'):
+                    # orderData.transactionId = str(platOrderNo)
                     orderData.status = "SUCCESS"
-                    orderData.tradingId = str(crmRes['result']['brokerUserExternalId'])
+                    # orderData.tradingId = str(crmRes['result']['brokerUserExternalId'])
                     orderData.save()
-                    print("--------------------Successs")
+                    # print("--------------------Successs")
+                    logger.error(f"orderId: {orderId}, success", exc_info=True)
                     return Response({"code": "200", "msg": "success"}, status=status.HTTP_200_OK)
             
             
             return Response({"code": "400", "status": "failed"}, status=status.HTTP_200_OK)
 
         except Exception as e:
-            print(f"Error in the Cheezee Pay Webhook Call : {str(e)}")
+            logger.error(f"Error in the Cheezee Pay Webhook Call : {str(e)}", exc_info=True)
             response['status'] = 'error'
             response['errorcode'] = status.HTTP_400_BAD_REQUEST
             response['reason'] = str(e)
