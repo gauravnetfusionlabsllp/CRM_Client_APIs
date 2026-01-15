@@ -7,6 +7,12 @@ from apps.payment.constant.cheesee_pay_key_constant import PlatformPublicKey, Me
 from apps.core.DBConnection import *
 import json
 
+import logging
+import logging.config
+from django.conf import settings
+logging.config.dictConfig(settings.LOGGING)
+logger = logging.getLogger('custom_logger')
+
 CHEEZEE_PAYOUT_WEBHOOK = os.environ['CHEEZEE_PAYOUT_WEBHOOK']
 print(CHEEZEE_PAYOUT_WEBHOOK,"---------------------------WEBHOOK")
 
@@ -78,10 +84,12 @@ class CheezePayPSP:
             if resp.get("code") == "000000":
                 print(resp,"-------------------------------150")
                 return resp
-            return {'error': 'PSP Request Failed!!!!!'}
+
+            logger.error(f"Error in Cheezee pay withdrawal: {resp}")
+            return resp
         
         except Exception as e:
-            print(f"Error in the CheezeePay PayOut Order: {str(e)}")
+            logger.error(f"Error in the CheezeePay PayOut Order: {str(e)}")
             return False
             
 
