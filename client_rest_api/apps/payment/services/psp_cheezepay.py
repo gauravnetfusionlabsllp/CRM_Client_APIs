@@ -78,6 +78,7 @@ class CheezePayPSP:
             if resp.get("code") == "000000":
                 print(resp,"-------------------------------150")
                 return resp
+            return {'error': 'PSP Request Failed!!!!!'}
         
         except Exception as e:
             print(f"Error in the CheezeePay PayOut Order: {str(e)}")
