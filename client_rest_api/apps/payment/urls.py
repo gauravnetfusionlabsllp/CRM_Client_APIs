@@ -41,4 +41,7 @@ urlpatterns = [
 
    path('hide-withdrawal-request/', views.HideWithdarwalRequest.as_view(), name="hide-delete-request"),
 
+   path('kyc-status/', views.KYCStatusView.as_view(), name="kyc-status"),
+   
+
 ]

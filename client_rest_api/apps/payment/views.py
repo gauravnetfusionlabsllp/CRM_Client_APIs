@@ -60,6 +60,7 @@ from apps.payment.constant.change_user_category_constant import check_and_update
 from apps.payment.services.psp_mat2pay_methods import payment_getway
 from apps.payment.constant.change_user_category_constant import *
 from apps.users.helpers.twilio_sending_message_helpers import send_text_message, verify_otp
+from apps.users.models import KYCStatus
 
 from django.db.models import Q
 
@@ -1915,3 +1916,49 @@ class HideWithdarwalRequest(APIView):
             response['reason'] = str(e)
             response['httpstatus'] = status.HTTP_400_BAD_REQUEST
             return Response(response, status=response.get('httpstatus'))
+
+
+
+
+
+class KYCStatusView(APIView):
+    def post(self, request):
+        try:
+            response = {"status": "success", "errorcode": "","reason": "", "result": "", "httpstatus": status.HTTP_200_OK}
+            # __data = request.data    
+            user_id = request.session_user
+            if not user_id:
+                response['status'] = 'error'
+                response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                response['reason'] = "User Not Found!!!"
+                response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                return Response(response, status=response.get('httpstatus'))
+            query =f"""
+                        SELECT u.full_name, u.email FROM crmdb.users AS u where u.id = {user_id}
+                    """
+            data = DBConnection._forFetchingJson(query, using='replica')
+            if not data:
+                response['status'] = 'error'
+                response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                response['reason'] = "Unable to fetch user details from the MySQL Database!!"
+                response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                return Response(response, status=response.get('httpstatus'))
+            
+            full_name = data[0].get('full_name', "None")
+            email = data[0].get('email', "None")
+            kyc_obj, created = KYCStatus.objects.update_or_create(
+                email=email,
+                defaults={"kyc_status": "pending"}
+            )
+            response["result"] = {
+                "full_name": full_name,
+                "email": email,
+                "kyc_status": kyc_obj.kyc_status,
+                "created": created
+            }
+            return Response(response, status=response.get('httpstatus'))
+        except Exception as e:
+            response["status"] = "error"
+            response["reason"] = str(e)
+            response["httpstatus"] = status.HTTP_400_BAD_REQUEST
+            return JsonResponse(response, status=response['httpstatus'])
