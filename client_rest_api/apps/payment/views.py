@@ -416,6 +416,7 @@ class WithdrawalRequest(APIView):
                 return Response(response, status=response.get('httpstatus'))
 
             user_id = request.session_user
+            
             # user_id = __data.get('user_id')
             __data["userId"] = user_id
             if __data:
@@ -483,6 +484,16 @@ class WithdrawalRequest(APIView):
             response = {"status": "success", "errorcode": "", "reason": "", "result":"", "httpstatus": status.HTTP_200_OK}
             __data = request.data.get('data')
             finalInrAmount = __data.get('finalInrAmount')
+
+            user_id = request.session_user
+            print(user_id)
+            if user_id == 23293:
+                response['status'] = 'error'
+                response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                response['reason'] = "User Dont have the Permission"
+                response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                return Response(response, status=response.get('httpstatus'))
+
             # usdAmount = __data.get('usdAmount')
             if __data:
                 response_message = {}
