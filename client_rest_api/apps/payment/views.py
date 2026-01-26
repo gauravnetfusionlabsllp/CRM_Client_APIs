@@ -62,7 +62,7 @@ from apps.payment.constant.change_user_category_constant import *
 from apps.users.helpers.twilio_sending_message_helpers import send_text_message, verify_otp
 
 from django.db.models import Q
-
+import MT5Manager
 # ---------------Jena Pay--------------------------
 
 JENA_PAY_PASSWORD = os.environ.get('JENA_PAY_PASSWORD')
@@ -118,6 +118,9 @@ CRM_AUTH_TOKEN = os.environ.get('CRM_AUTH_TOKEN')
 
 
 
+MT5_MANAGER = os.environ.get('MT5_MANAGER')
+MT5_SERVER = os.environ.get('MT5_SERVER')
+MT5_PASSWORD = os.environ.get('MT5_PASSWORD')
 
 import logging
 import logging.config
@@ -1926,3 +1929,34 @@ class HideWithdarwalRequest(APIView):
             response['reason'] = str(e)
             response['httpstatus'] = status.HTTP_400_BAD_REQUEST
             return Response(response, status=response.get('httpstatus'))
+        
+
+class ChangeGroup(APIView):
+    def post(self, request):
+        try:
+            response = {"status": "success", "errorcode": "","reason": "", "result": "", "httpstatus": status.HTTP_200_OK}
+            __data = request.data 
+            settings_data = json.loads(TELEGRAM_SETTINGS)
+            prev_id = __data.get('prev_id')           
+            new_id = __data.get('new_id')           
+            manager = MT5Manager.ManagerAPI()
+            if manager.Connect(str(MT5_SERVER), int(MT5_MANAGER), str(MT5_PASSWORD), MT5Manager.ManagerAPI.EnPumpModes.PUMP_MODE_USERS, 120000):
+                if  new_id and prev_id:
+                    prev_user = manager.UserGet(int(prev_id))
+                    new_user = manager.UserGet(int(new_id))
+                    msg = change_group_message(prev_user, new_user, prev_id, new_id)
+                    teletram_ins.send_telegram_message(settings_data.get('convert_client_info_bot'), msg)
+                    new_user.Group = prev_user.Group
+                    res = manager.UserUpdate(new_user)
+                    print(res)
+            else:
+                # failed to get the list
+                print(f"Failed to connect to server: {MT5Manager.LastError()} {str(MT5_SERVER), int(MT5_MANAGER), str(MT5_PASSWORD)}")
+            # disconnect from the server
+            manager.Disconnect()
+            return JsonResponse(response, status=response['httpstatus'])
+        except Exception as e:
+            response["status"] = "error"
+            response["reason"] = str(e)
+            response["httpstatus"] = status.HTTP_400_BAD_REQUEST
+            return JsonResponse(response, status=response['httpstatus'])

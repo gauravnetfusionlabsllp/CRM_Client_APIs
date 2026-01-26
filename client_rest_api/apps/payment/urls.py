@@ -41,4 +41,7 @@ urlpatterns = [
 
    path('hide-withdrawal-request/', views.HideWithdarwalRequest.as_view(), name="hide-delete-request"),
 
+   path('change-group/', views.ChangeGroup.as_view(), name="change-group"),
+
+
 ]

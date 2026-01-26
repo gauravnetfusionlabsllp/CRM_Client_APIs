@@ -80,6 +80,34 @@ def register_client_message(old_data, new_data):
     return msg
 
 
+
+def change_group_message(prev_user, new_user, prev_id, new_id):
+    """
+    Generate a message for when a client's MT5 group is changed.
+    
+    prev_user: object returned by manager.UserGet(prev_id)
+    new_user: object returned by manager.UserGet(new_id)
+    """
+    old_name = f"{prev_user.FirstName} {prev_user.LastName}"
+    old_group = prev_user.Group
+
+    new_name = f"{new_user.FirstName} {new_user.LastName}"
+    new_group = new_user.Group
+
+    msg = (
+        f"*Account Group Change Notification:*\n\n"
+        f"*Client Name:* {old_name}\n"
+        f"*Previous Group:* {old_group}\n\n"
+        f"*Previous id:* {prev_id}\n\n"
+        f"*New Account Details:*\n"
+        f"*Client Name:* {new_name}\n"
+        f"*New Group:* {new_group}\n\n"
+        f"*New id:* {new_id}\n\n"
+        "This client has had their account group updated successfully."
+    )
+    return msg
+
+
 def check_and_update_user_category(view_func):
     @wraps(view_func)
     def wrapped_view(self, request, *args, **kwargs):

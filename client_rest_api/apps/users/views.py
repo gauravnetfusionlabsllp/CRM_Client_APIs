@@ -25,7 +25,7 @@ from apps.users.helpers.twilio_sending_message_helpers import send_text_message,
 
 # Create your views here.
 
-load_dotenv()
+
 
 CRM_PUT_USER = os.environ['CRM_PUT_USER']
 CRM_AUTH_TOKEN = os.environ.get('CRM_AUTH_TOKEN')
@@ -473,5 +473,4 @@ class VisitView(APIView):
             response["httpstatus"] = 500
             return JsonResponse(response, status=response['httpstatus'])
         
-
 
