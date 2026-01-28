@@ -22,7 +22,7 @@ import json
 
 from apps.payment.constant.change_user_category_constant import *
 from apps.users.helpers.twilio_sending_message_helpers import send_text_message, verify_otp, generate_and_send_otp, get_saved_otp
-
+from apps.core.WebEngage import *
 # Create your views here.
 
 load_dotenv()
@@ -233,16 +233,66 @@ class RegisterView(APIView):
                     serializer = RegistrationLogSerializer(record, data=log_update, partial=True)
                     if serializer.is_valid():
                         try:
+                            
+                            location = {
+                                "country": __data.get('countryIso',''),
+                                "city": __data.get('city',''),
+                                "region": __data.get('state',''),
+                                "locality": __data.get('full_address',''),
+                                "postalCode": __data.get('zip',''),
+                            }
+                            try:
+                                wbres = upsert_user(
+                                    user_id=__data.get('email'),
+                                    first_name=__data.get('firstName'),
+                                    last_name=__data.get('lastName'),
+                                    email=__data.get('email'),
+                                    phone=str(__data.get('telephonePrefix'))+str(__data.get('telephone')),
+                                    location=location
+                                )
+                                if (wbres or {}).get('response', {}).get('status') == 'queued':
+                                    print("data has been saved in wbres -----------")
+                                else:
+                                    print("something went wrong in wbres")
+
+                                wbregres = registration_completed(
+                                    user_id=__data.get('email'),
+                                    source=__data.get('registrationDeviceType'),
+                                    timestamp=timestamp
+                                    )
+                                if (wbregres or {}).get('response', {}).get('status') == 'queued':
+                                    print("data has been saved in wbregres -----------")
+                                else:
+                                    print("something went wrong in wbregres")
+                            except Exception as e:
+                                print("WB upsert failed", e)
+
+                            
                             serializer.save()
                             mssg = error_response(__data.get('telephone'), __data.get('email'), "Registered Successfully!!!")
                             teletram_ins.send_telegram_message(settings_data.get('convert_client_info_bot'), mssg)
                             print("Record updated successfully")
                         except Exception as save_exception:
                             print(f"Error saving record: {save_exception}")
+                            wbregres = registration_failed(user_id=__data.get('email'),failure_reason= str(save_exception),timestamp=timestamp)
+                            if (wbregres or {}).get('response', {}).get('status') == 'queued':
+                                print("data has been saved in wbregres -----------")
+                            else:
+                                print("something went wrong in wbregres")
                     else:
                         print(f"Serializer validation errors: {serializer.errors}")
+                        wbregres = registration_failed(user_id=__data.get('email'),failure_reason= str(serializer.errors),timestamp=timestamp)
+                        if (wbregres or {}).get('response', {}).get('status') == 'queued':
+                            print("data has been saved in wbregres -----------")
+                        else:
+                            print("something went wrong in wbregres")
                 else:
                     print("No record found with the provided email")
+                    wbregres = registration_failed(user_id=__data.get('email'),failure_reason= "No record found with the provided email",timestamp=timestamp)
+                    if (wbregres or {}).get('response', {}).get('status') == 'queued':
+                        print("data has been saved in wbregres -----------")
+                    else:
+                        print("something went wrong in wbregres")
                     
                 response['httpstatus'] = HTTP_200_OK
                 response['status'] = "success"
@@ -480,6 +530,12 @@ class VisitView(APIView):
             return JsonResponse(response, status=response['httpstatus'])
         
 
+  
+class User_Regulation_Error_Logs(APIView): 
+
+    def post(self, request):
+        try:
+            response = {"status": "success", "errorcode": "", "result": "", "reason": "", "httpstatus": status.HTTP_200_OK}
 
 class User_Regulation_Error_Logs(APIView): 
 
@@ -505,4 +561,37 @@ class User_Regulation_Error_Logs(APIView):
             response['errorcode'] = status.HTTP_400_BAD_REQUEST
             response['reason'] = str(e)
             response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+            return Response(response, status=response.get('httpstatus'))
+class KYCStatusView(APIView):
+    def post(self, request):
+        try:
+            response = {"status": "success", "errorcode": "","reason": "", "result": "", "httpstatus": HTTP_200_OK}
+            # __data = request.data    
+            user_id = request.session_user
+            if not user_id:
+                response['status'] = 'error'
+                response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                response['reason'] = "User Not Found!!!"
+                response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                return Response(response, status=response.get('httpstatus'))
+            
+            query =f"""
+                        SELECT u.full_name, u.email FROM crmdb.users AS u where u.id = {user_id}
+                    """
+            data = DBConnection._forFetchingJson(query, using='replica')
+            if not data:
+                response['status'] = 'error'
+                response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                response['reason'] = "Unable to fetch user details from the MySQL Database!!"
+                response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                return Response(response, status=response.get('httpstatus'))
+            
+            full_name = data[0].get('full_name', "None")
+            email = data[0].get('email', "None")
+            print(email)
+        except Exception as e:
+            response["status"] = "error"
+            response["reason"] = str(e)
+            response["httpstatus"] = HTTP_400_BAD_REQUEST
+            return JsonResponse(response, status=response['httpstatus'])
             return Response(response, status=response.get('httpstatus'))

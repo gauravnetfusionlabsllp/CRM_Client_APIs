@@ -76,6 +76,7 @@ INSTALLED_APPS = [
     'apps.users',
     'apps.dashboard_admin',
     'rest_framework',
+    'django_crontab',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -234,3 +235,11 @@ LOGGING = {
     },
 }
 
+
+
+
+CRONJOBS = [
+    ('*/5 * * * *', 'apps.payment.WebEngage.kyc.check_pending_kyc'),
+    ('*/5 * * * *', 'apps.payment.WebEngage.transactions.transaction_event'),
+    ('15 13 * * *', 'apps.payment.WebEngage.daily_event.trade_login')
+]
