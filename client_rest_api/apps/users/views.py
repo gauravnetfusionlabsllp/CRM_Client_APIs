@@ -531,11 +531,11 @@ class VisitView(APIView):
         
 
   
-class User_Regulation_Error_Logs(APIView): 
+# class User_Regulation_Error_Logs(APIView): 
 
-    def post(self, request):
-        try:
-            response = {"status": "success", "errorcode": "", "result": "", "reason": "", "httpstatus": status.HTTP_200_OK}
+#     def post(self, request):
+#         try:
+#             response = {"status": "success", "errorcode": "", "result": "", "reason": "", "httpstatus": status.HTTP_200_OK}
 
 class User_Regulation_Error_Logs(APIView): 
 
