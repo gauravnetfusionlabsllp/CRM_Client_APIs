@@ -537,6 +537,12 @@ class User_Regulation_Error_Logs(APIView):
         try:
             response = {"status": "success", "errorcode": "", "result": "", "reason": "", "httpstatus": status.HTTP_200_OK}
 
+class User_Regulation_Error_Logs(APIView): 
+
+    def post(self, request):
+        try:
+            response = {"status": "success", "errorcode": "", "result": "", "reason": "", "httpstatus": status.HTTP_200_OK}
+
             data = request.data.get('data')
 
             if not data:
@@ -588,3 +594,4 @@ class KYCStatusView(APIView):
             response["reason"] = str(e)
             response["httpstatus"] = HTTP_400_BAD_REQUEST
             return JsonResponse(response, status=response['httpstatus'])
+            return Response(response, status=response.get('httpstatus'))
