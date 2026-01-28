@@ -36,3 +36,12 @@ class ChangeReguslationLog(models.Model):
     uuid = models.CharField(max_length=100, blank=True, null=True, unique=True)
     def __str__(self):
         return f"{self.old_email}"
+
+
+
+
+class KYCStatus(models.Model):
+    email = models.EmailField(blank=True, null=True, unique=True)
+    kyc_status = models.CharField(max_length=100, blank=True, null=True)
+    def __str__(self):
+        return f"{self.email}"

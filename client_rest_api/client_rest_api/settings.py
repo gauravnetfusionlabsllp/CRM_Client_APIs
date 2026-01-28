@@ -76,6 +76,7 @@ INSTALLED_APPS = [
     'apps.users',
     'apps.dashboard_admin',
     'rest_framework',
+    'django_crontab',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -234,3 +235,9 @@ LOGGING = {
     },
 }
 
+
+
+
+CRONJOBS = [
+    ('*/2 * * * *', 'apps.payment.kyc.check_pending_kyc.check_pending_kyc'),
+]

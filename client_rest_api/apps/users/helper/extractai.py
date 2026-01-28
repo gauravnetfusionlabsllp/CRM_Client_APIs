@@ -8,7 +8,7 @@ from openai import OpenAI
 import pdf2image
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-TESSERACT = os.environ.get('TESSERACT')
+TESSERACT = r"C:/Program Files/Tesseract-OCR/tesseract.exe"
 # -------------------------------------------------------------
 # Configuration
 # -------------------------------------------------------------
@@ -18,7 +18,7 @@ load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 TESSERACT = os.getenv("TESSERACT")
 
-pytesseract.pytesseract.tesseract_cmd =  TESSERACT
+pytesseract.pytesseract.tesseract_cmd =  r"C:/Program Files/Tesseract-OCR/tesseract.exe"
 if not OPENAI_API_KEY:
     raise RuntimeError("Set OPENAI_API_KEY in environment or .env file")
 
