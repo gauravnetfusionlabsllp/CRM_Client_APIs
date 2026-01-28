@@ -530,7 +530,7 @@ class VisitView(APIView):
             return JsonResponse(response, status=response['httpstatus'])
         
 
-
+  
 class User_Regulation_Error_Logs(APIView): 
 
     def post(self, request):
