@@ -127,6 +127,7 @@ class CRM:
             response = requests.put(str(CRM_MANUAL_WITHDRAWAL_UPDATE_URL), json=payload ,headers=headers)
             if response.status_code == 200:
                 return response.json()
+                print(response,"------------------------150")
             else:
                 return {'success': False }
         except Exception as e:

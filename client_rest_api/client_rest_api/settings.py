@@ -239,5 +239,7 @@ LOGGING = {
 
 
 CRONJOBS = [
-    ('*/2 * * * *', 'apps.payment.kyc.check_pending_kyc.check_pending_kyc'),
+    ('*/5 * * * *', 'apps.payment.WebEngage.kyc.check_pending_kyc'),
+    ('*/5 * * * *', 'apps.payment.WebEngage.transactions.transaction_event'),
+    ('15 13 * * *', 'apps.payment.WebEngage.daily_event.trade_login')
 ]

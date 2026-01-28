@@ -49,6 +49,7 @@ def _post_request(url, payload):
         response.raise_for_status()
         return response.json()
     except RequestException as e:
+        print("ERROR: ", str(e))
         return {"success": False, "error": str(e), "response": getattr(e.response, "text", None)}
 
 def track_event(user_id, event_name, event_time=None, event_data=None):
@@ -56,6 +57,7 @@ def track_event(user_id, event_name, event_time=None, event_data=None):
     payload = {"userId": user_id, "eventName": event_name}
     if event_time: payload["eventTime"] = event_time
     if event_data: payload["eventData"] = event_data
+    print('-------------- 01')
     return _post_request(url, payload)
 
 # -------------------- User Upsert --------------------
@@ -67,7 +69,6 @@ def upsert_user(user_id, first_name=None, last_name=None, birth_date=None,
     url = f"{WBHOST}/v1/accounts/{WBLICENSE_CODE}/users"
 
     payload = {"userId": user_id}
-    print("---------------------- 01")
     if first_name:
         payload["firstName"] = first_name
     if last_name:
@@ -84,7 +85,6 @@ def upsert_user(user_id, first_name=None, last_name=None, birth_date=None,
         payload["company"] = company
     if attributes:
         payload["attributes"] = attributes
-    print("---------------------- 02")
     # if attributes.get('Country', ''):
     #     payload["country"] = attributes.get('Country', '')
     if location:
@@ -95,7 +95,6 @@ def upsert_user(user_id, first_name=None, last_name=None, birth_date=None,
     try:
         response = requests.post(url, json=payload, headers=HEADERS, timeout=5)
         response.raise_for_status()
-        print("------------------------ 01")
         return response.json()
     except RequestException as e:
         return {

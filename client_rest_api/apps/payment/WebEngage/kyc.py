@@ -1,7 +1,7 @@
 from django.db import transaction
 from apps.users.models import KYCStatus
 from apps.core.DBConnection import *
-
+from apps.core.WebEngage import *
 
 import logging
 import logging.config
@@ -10,20 +10,11 @@ logging.config.dictConfig(settings.LOGGING)
 logger = logging.getLogger('custom_logger')
 
 
-# import logging
-# from datetime import datetime
-
-# logger = logging.getLogger('cron')
-
-
 def check_pending_kyc():
-    logger.error('---------- job working')
-
     pending_kyc = KYCStatus.objects.filter(kyc_status='pending')
-    print(pending_kyc, '------------------')
     for kyc in pending_kyc:
         query = f"""
-            SELECT u.email, u.kyc_status
+            SELECT u.email, u.kyc_status, u.kyc_note
             FROM crmdb.users AS u
             WHERE u.email = '{kyc.email}'
         """
@@ -33,9 +24,12 @@ def check_pending_kyc():
             continue
         
         external_status = data[0].get('kyc_status')
+        kyc_note = data[0].get('kyc_note', '')
         email = data[0].get('email')
 
         if external_status == 4:
+            # kyc_approved(email, timestamp, timestamp)
+            kyc_rejected(email, kyc_note, timestamp)
             kyc.kyc_status = 'approved'
         elif external_status == 5:
             kyc.kyc_status = 'rejected'
