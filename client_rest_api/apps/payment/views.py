@@ -42,7 +42,7 @@ from apps.payment.services.psp_router import PSPRouter
 from apps.users.helper.extractai import *
 from apps.users.serializers import *
 from apps.core.telegram_api import *
-
+from apps.core.WebEngage import *
 
 
 import mysql.connector
@@ -393,13 +393,17 @@ class WithdrawalRequest(APIView):
             response = {"status": "success", "errorcode": "", "reason": "", "result":"", "httpstatus": status.HTTP_200_OK}
             __data = request.data.get('data')
             withdrawalId  = request.data.get('withdrawalId')
+            print('--------------------02')
+
 
             if not withdrawalId:
                 response['status'] = "error"
                 response['errorcode'] = status.HTTP_400_BAD_REQUEST
                 response['reason'] = "Withdrawal Id is required!!"
             try:
+                print('--------------------03')
                 withObj = WithdrawalApprovals.objects.get(id=int(withdrawalId))
+                print('--------------------04')
             except WithdrawalApprovals.DoesNotExist:
                 response = {
                     'status': 'error',
@@ -421,6 +425,7 @@ class WithdrawalRequest(APIView):
             # user_id = __data.get('user_id')
             __data["userId"] = user_id
             if __data:
+                print('--------------------01')
                 crmRes = crm_api.initial_withdrawal(__data)
                 print("crmRes: ", crmRes)
                 if not crmRes.get("success"):
@@ -451,6 +456,25 @@ class WithdrawalRequest(APIView):
                         instance = order_seializer.save()
                         created_id = instance.id
                         __data['ordertransactionid'] = created_id
+
+                        if __data.get("pspName") == "cheezepay":
+                            method = 'Mobile Money'
+                        else:
+                            method = 'Crypto'
+
+                        wbregres = withdrawal_request(
+                                    user_id=__data["email"],
+                                    amount=__data["amount"],
+                                    currency='USD',
+                                    method=method,
+                                    timestamp=timestamp
+                                    )
+                        if (wbregres or {}).get('response', {}).get('status') == 'queued':
+                            print(" withdrawal_request -----------", wbregres)
+                        else:
+                            print("withdrawal_request failed")
+
+
                     else:
                         print("ERROR in saving data in order_seializer withdrawal request: ", str(order_seializer.errors))
                     response['result'] = "Withdrawal request hase been sent to admin...!!"
@@ -551,10 +575,22 @@ class WithdrawalRequest(APIView):
                                 method=psp_method,
                                 pspId=psp_id
                             )
-
+                        print(crmRes, '----------------------------- 44')
                         response['reason'] = str("Transaction approved.")
                     else:
                         crmRes = crm_api.cancel_withdrawal(approval.brokerBankingId)
+                        wbregres = withdrawal_failed(
+                                    user_id=approval.email,
+                                    amount=int(approval.amount),
+                                    method= 'Mobile Money' if str(approval.pspName).lower() else 'Crypto',
+                                    failure_reason=note,
+                                    timestamp=timestamp
+                                    )
+                        if (wbregres or {}).get('response', {}).get('status') == 'queued':
+                            print(" withdrawal_failed -----------", wbregres)
+                        else:
+                            print("withdrawal_failed failed")
+
                         if not crmRes.get("success"):
                             response['errorcode'] = status.HTTP_400_BAD_REQUEST
                             response['httpstatus'] = response['errorcode']
@@ -594,22 +630,34 @@ class WithdrawalRequest(APIView):
                     approval.second_approval_action = action
                     approval.second_approval_note = note
                     approval.second_approval_at = timezone.now()
-                    approval.save()
+                    # approval.save()
 
                     # ✅ If second stage NOT approved → STOP here
                     if not action:
-                        crmRes = crm_api.cancel_withdrawal(approval.brokerBankingId)
-                        # print("crmRes", crmRes)
-                        if not crmRes.get("success"):
-                            response['errorcode'] = status.HTTP_400_BAD_REQUEST
-                            response['httpstatus'] = response['errorcode']
-                            response['reason'] = str(crmRes["result"])
-                        else :
-                            order = approval.ordertransactionid
-                            if order:
-                                order.status = "CANCELLED"
-                                order.save()
-                            response_message['crm_api'] = "Withdrawal request hase been declined!!"
+                        wbregres = withdrawal_failed(
+                                    user_id=approval.email,
+                                    amount=int(approval.amount),
+                                    method= 'Mobile Money' if str(approval.pspName).lower() else 'Crypto',
+                                    failure_reason=note,
+                                    timestamp=timestamp
+                                    )
+                        if (wbregres or {}).get('response', {}).get('status') == 'queued':
+                            print(" withdrawal_failed -----------", wbregres)
+                        else:
+                            print("withdrawal_failed failed")
+
+                        # crmRes = crm_api.cancel_withdrawal(approval.brokerBankingId)
+                        # # print("crmRes", crmRes)
+                        # if not crmRes.get("success"):
+                        #     response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                        #     response['httpstatus'] = response['errorcode']
+                        #     response['reason'] = str(crmRes["result"])
+                        # else :
+                        #     order = approval.ordertransactionid
+                        #     if order:
+                        #         order.status = "CANCELLED"
+                        #         order.save()
+                        #     response_message['crm_api'] = "Withdrawal request hase been declined!!"
 
                         response['status'] = 'error'
                         response['errorcode'] = status.HTTP_200_OK
@@ -618,45 +666,58 @@ class WithdrawalRequest(APIView):
                         return Response(response, status=200)
 
                     if action:
-                        try:
-                            psp = PSPRouter.get_psp(approval.pspName)
-                        except Exception as e:
-                            response['status'] = 'error'
-                            response['errorcode'] = status.HTTP_400_BAD_REQUEST
-                            response['reason'] = str(e)
-                            response['httpstatus'] = status.HTTP_400_BAD_REQUEST
-                            return Response(response, status=400)
-                        try:
-                            psp_response = psp.payout(approval, finalInrAmount)
-                            print("PSP Response:", psp_response)
-                            if isinstance(psp_response, dict) and psp_response.get("success") is True or psp_response.get('msg') == "success":
-                                response_message["psp_payout"] = "Payout Successful!"
-                                print("✅ Payout Successful!")
-                            elif isinstance(psp_response, dict) and psp_response.get("success") is False:
-                                response_message["psp_payout"] = "Payout Failed!"
-                                print("❌ Payout Failed:", psp_response.get("errorMessage"))
-                            elif hasattr(psp_response, "status_code"):
-                                if psp_response.status_code != 200:
-                                    response_message["psp_payout"] = "Payout Failed!"
-                                    print("❌ HTTP Error:", psp_response.status_code)
-                                body = psp_response.json()
-                                if body.get("success") is False:
-                                    response_message["psp_payout"] = "Payout Failed!"
+                        wbregres = withdrawal_approved(
+                                    user_id=approval.email,
+                                    amount=int(approval.amount),
+                                    currency='USD',
+                                    method= 'Mobile Money' if str(approval.pspName).lower() else 'Crypto',
+                                    approved_at=timestamp,
+                                    timestamp=timestamp
+                                    )
+                        if (wbregres or {}).get('response', {}).get('status') == 'queued':
+                            print(" withdrawal_approved -----------", wbregres)
+                        else:
+                            print("withdrawal_approved failed")
+# -------------------------------------------------------------
+                        # try:
+                        #     psp = PSPRouter.get_psp(approval.pspName)
+                        # except Exception as e:
+                        #     response['status'] = 'error'
+                        #     response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                        #     response['reason'] = str(e)
+                        #     response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                        #     return Response(response, status=400)
+                        # try:
+                        #     psp_response = psp.payout(approval, finalInrAmount)
+                        #     print("PSP Response:", psp_response)
+                        #     if isinstance(psp_response, dict) and psp_response.get("success") is True or psp_response.get('msg') == "success":
+                        #         response_message["psp_payout"] = "Payout Successful!"
+                        #         print("✅ Payout Successful!")
+                        #     elif isinstance(psp_response, dict) and psp_response.get("success") is False:
+                        #         response_message["psp_payout"] = "Payout Failed!"
+                        #         print("❌ Payout Failed:", psp_response.get("errorMessage"))
+                        #     elif hasattr(psp_response, "status_code"):
+                        #         if psp_response.status_code != 200:
+                        #             response_message["psp_payout"] = "Payout Failed!"
+                        #             print("❌ HTTP Error:", psp_response.status_code)
+                        #         body = psp_response.json()
+                        #         if body.get("success") is False:
+                        #             response_message["psp_payout"] = "Payout Failed!"
 
-                                response_message["psp_payout"] = "Payout Successful!"
-                            else:
-                                # 4. Unexpected format
-                                print("❌ Unexpected PSP response format:", psp_response)
-                                response_message["psp_payout"] = "Unexpected response format"
+                        #         response_message["psp_payout"] = "Payout Successful!"
+                        #     else:
+                        #         # 4. Unexpected format
+                        #         print("❌ Unexpected PSP response format:", psp_response)
+                        #         response_message["psp_payout"] = "Unexpected response format"
 
-                        except Exception as e:
-                            print("❌ EXCEPTION during payout:", str(e))
-                            response['status'] = 'error'
-                            response["errorcode"] = status.HTTP_400_BAD_REQUEST
-                            response['reason'] = f"Error During Payout: {str(e)}"
-                            response['httpstatus'] = status.HTTP_400_BAD_REQUEST
-                            return Response(response, status=response.get('httpstatus'))
-
+                        # except Exception as e:
+                        #     print("❌ EXCEPTION during payout:", str(e))
+                        #     response['status'] = 'error'
+                        #     response["errorcode"] = status.HTTP_400_BAD_REQUEST
+                        #     response['reason'] = f"Error During Payout: {str(e)}"
+                        #     response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                        #     return Response(response, status=response.get('httpstatus'))
+# ------------------------------------------------------------------
                         # # crmRes = crm_api.verify_withdrawal(approval.brokerBankingId)
                         # # print("crmRes", crmRes)
                         # if not crmRes.get("success"):
