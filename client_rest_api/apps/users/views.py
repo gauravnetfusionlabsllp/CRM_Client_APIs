@@ -35,6 +35,12 @@ settings_data = json.loads(TELEGRAM_SETTINGS)
 
 teletram_ins = TelegramAPI()
 
+import logging
+import logging.config
+from django.conf import settings
+logging.config.dictConfig(settings.LOGGING)
+logger = logging.getLogger('custom_logger')
+
 class CheckUserPhoneNumber(APIView):
 
     def get(self, request):
@@ -475,3 +481,28 @@ class VisitView(APIView):
         
 
 
+class User_Regulation_Error_Logs(APIView): 
+
+    def post(self, request):
+        try:
+            response = {"status": "success", "errorcode": "", "result": "", "reason": "", "httpstatus": status.HTTP_200_OK}
+
+            data = request.data.get('data')
+
+            if not data:
+                logger.error(f"Error Regulation Data not Found!!!")
+                response['status'] = 'error'
+                response['reason'] = "Regulation Data not found!!!"
+                return Response(response, status=response.get('httpstatus'))
+            
+
+            logger.error(f"Regulation Data: {data}")
+            return Response(response, status=response.get('httpstatus'))
+
+        except Exception as e:
+            logger.error(f"Error in User Regulation: {str(e)}", exc_info=True)
+            response['status'] = 'error'
+            response['errorcode'] = status.HTTP_400_BAD_REQUEST
+            response['reason'] = str(e)
+            response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+            return Response(response, status=response.get('httpstatus'))
