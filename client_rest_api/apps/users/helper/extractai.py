@@ -8,7 +8,7 @@ from openai import OpenAI
 import pdf2image
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-TESSERACT = r"C:/Program Files/Tesseract-OCR/tesseract.exe"
+TESSERACT = os.environ.get('TESSERACT')
 # -------------------------------------------------------------
 # Configuration
 # -------------------------------------------------------------
