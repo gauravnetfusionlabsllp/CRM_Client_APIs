@@ -31,9 +31,9 @@ def check_pending_kyc():
         if external_status == 4:
             # kyc_approved(email, timestamp, timestamp)
             kyc_rejected(email, kyc_note, timestamp)
-            kyc.kyc_status = 'approved'
+            kyc.kyc_status = 'Approved'
         elif external_status == 5:
-            kyc.kyc_status = 'rejected'
+            kyc.kyc_status = 'Rejected'
         else:
             continue
 

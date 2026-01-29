@@ -223,6 +223,7 @@ def transaction_event():
                                 SUM(bu.balance) AS total_balance
                             FROM crmdb.broker_user AS bu
                             WHERE bu.email = '{email}'
+                            AND bu.is_demo=0
                             GROUP BY bu.email;
                         """
         temp_data = DBConnection._forFetchingJson(temp_query, using='replica')
@@ -235,5 +236,66 @@ def transaction_event():
                 }
             )
         print("[SUCCESS] last_trade:", res, email, int(total_balance))
+
+
+    query = f"""
+                SELECT u.email, u.first_name , u.last_name , u.country_iso , u.telephone_prefix , u.full_address , u.city , u.zip , u.date_of_birth  , u.telephone , u.gender,   u.creation_time, u.registration_app, u.kyc_status  FROM crmdb.users AS u
+                where u.creation_time  >= NOW() - INTERVAL 10 MINUTE
+                        ORDER BY u.creation_time  DESC;
+            """
+    
+    try:
+        data = DBConnection._forFetchingJson(query, using='replica')
+    except Exception as e:
+        print(f"[ERROR] DB fetch failed: {e}")
+        return
+
+    for transaction in data:
+        try:
+            email = transaction.get('email')
+            creation_time = transaction.get('creation_time')
+            registration_app = transaction.get('registration_app')
+            kyc_status = transaction.get('kyc_status')
+
+            first_name = transaction.get('first_name')
+            last_name = transaction.get('last_name')
+            country_iso = transaction.get('country_iso')
+            telephone_prefix = transaction.get('telephone_prefix')
+            telephone = transaction.get('telephone')
+            phone_number = f"+{str(telephone_prefix)} {str(telephone)}"
+            gender = transaction.get('gender')
+            if gender == 0:
+                gender = 'Male'
+            elif gender == 1:
+                gender = 'Female'
+            else:
+                gender = 'Other'
+
+            date_of_birth = transaction.get('date_of_birth')
+            city = transaction.get('city')
+            zip_code = transaction.get('zip')
+            full_address = transaction.get('full_address')
+            if kyc_status == 4:
+                status = 'Approved'
+            elif kyc_status == 5:
+                status = 'Rejected'
+            attributes = {
+                'Regulations': 'SGFX Saint Lucia' if registration_app == 2 else 'SGFX Mauritius',
+                'KYC Status': status
+            }
+            location = location = {
+                        "country": country_iso if country_iso else '',
+                        # "state": "MH",
+                        "city": city if city else '',
+                        "locality":  full_address if full_address else '',
+                        "postalCode":zip_code
+                        # "time_zone": "IST"
+                    }
+            res = upsert_user(user_id=email, first_name=first_name, last_name= last_name,
+                    gender= gender, email=email, phone=phone_number, attributes=attributes, location=location,
+             )
+            print("[SUCCESS] attributes:", res, email)
+        except Exception as e:
+            print(f"[ERROR] Failed processing transaction {transaction}: {e}")
 
 
