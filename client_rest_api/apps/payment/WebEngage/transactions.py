@@ -3,6 +3,7 @@ from django.db.models.functions import TruncDate
 from apps.users.models import KYCStatus, LowMarginNotifiedRec
 from apps.core.DBConnection import *
 from apps.core.WebEngage import *
+timestamp = current_webengage_time(offset_hours=-8)
 from datetime import datetime, timezone, timedelta
 import pandas as pd
 import logging
@@ -95,7 +96,7 @@ def transaction_event():
     for transaction in data:
         try:
             email = transaction.get('email')
-            amount = transaction.get('amount')/100
+            amount = int(transaction.get('amount')/100)
             tx_type = transaction.get('type')
             tx_method = transaction.get('transaction_method')
             is_ftd = transaction.get('is_ftd')

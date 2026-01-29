@@ -3,6 +3,7 @@ from django.db.models.functions import TruncDate
 from apps.users.models import KYCStatus, LowMarginNotifiedRec
 from apps.core.DBConnection import *
 from apps.core.WebEngage import *
+timestamp = current_webengage_time(offset_hours=-8)
 from datetime import datetime, timezone, timedelta
 import logging
 import logging.config

@@ -2,6 +2,7 @@ from django.db import transaction
 from apps.users.models import KYCStatus
 from apps.core.DBConnection import *
 from apps.core.WebEngage import *
+timestamp = current_webengage_time(offset_hours=-8)
 
 import logging
 import logging.config
