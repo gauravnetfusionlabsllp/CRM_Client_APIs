@@ -23,6 +23,7 @@ import json
 from apps.payment.constant.change_user_category_constant import *
 from apps.users.helpers.twilio_sending_message_helpers import send_text_message, verify_otp, generate_and_send_otp, get_saved_otp
 from apps.core.WebEngage import *
+timestamp = current_webengage_time(offset_hours=-8)
 # Create your views here.
 
 load_dotenv()

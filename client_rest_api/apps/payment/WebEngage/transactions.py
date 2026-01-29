@@ -3,6 +3,7 @@ from django.db.models.functions import TruncDate
 from apps.users.models import KYCStatus, LowMarginNotifiedRec
 from apps.core.DBConnection import *
 from apps.core.WebEngage import *
+timestamp = current_webengage_time(offset_hours=-8)
 from datetime import datetime, timezone, timedelta
 import pandas as pd
 import logging
@@ -78,7 +79,7 @@ def transaction_event():
         FROM crmdb.broker_banking AS bb
         LEFT JOIN crmdb.users AS u 
             ON u.id = bb.user_id
-        WHERE bb.last_update_time >= NOW() - INTERVAL 5 MINUTE
+        WHERE bb.last_update_time >= NOW() - INTERVAL 100 MINUTE
         ORDER BY bb.last_update_time DESC;
     """
 
@@ -95,7 +96,7 @@ def transaction_event():
     for transaction in data:
         try:
             email = transaction.get('email')
-            amount = transaction.get('amount')/100
+            amount = int(transaction.get('amount')/100)
             tx_type = transaction.get('type')
             tx_method = transaction.get('transaction_method')
             is_ftd = transaction.get('is_ftd')
@@ -153,86 +154,86 @@ def transaction_event():
         except Exception as e:
             print(f"[ERROR] Failed processing transaction {transaction}: {e}")
 
-    # ===================== check margin level ------------------
-    query = f"""
-                SELECT bu.email, bu.margin_level_stored, bu.equity, bu.balance FROM crmdb.broker_user AS bu where bu.margin_level_stored <= 100
-            """
-    try:
-        data = DBConnection._forFetchingJson(query, using='replica')
-    except Exception as e:
-        print(f"[ERROR] DB fetch failed: {e}")
-        return
-    
-    # if not data:
-    #     print("[INFO] No transactions found in last 30 minutes")
+    # # ===================== check margin level ------------------
+    # query = f"""
+    #             SELECT bu.email, bu.margin_level_stored, bu.equity, bu.balance FROM crmdb.broker_user AS bu where bu.margin_level_stored <= 100
+    #         """
+    # try:
+    #     data = DBConnection._forFetchingJson(query, using='replica')
+    # except Exception as e:
+    #     print(f"[ERROR] DB fetch failed: {e}")
     #     return
     
-    for transaction in data:
-        try:
-            email = transaction.get('email')
-            margin_level_stored = transaction.get('margin_level_stored', 0.0)
-            equity = transaction.get('equity')
-            balance = transaction.get('balance')/100
-
-            if can_send_low_margin_today(email):
-                timestamp = current_webengage_time(
-                    datetime.now(timezone.utc),
-                    offset_hours=-8
-                )
-
-                res = low_margin(
-                    user_id=email,
-                    account_balance=balance,
-                    equity=equity,
-                    margin_level=int(margin_level_stored),
-                    timestamp=timestamp
-                )
-                print("[SUCCESS] low_margin:", res)
-
-                # Save notification record
-                LowMarginNotifiedRec.objects.create(email=email)
-            else:
-                print(f"[SKIP] Low margin already sent today for {email}")
-        except Exception as e:
-            print(f"[ERROR] Failed processing transaction {transaction}: {e}")
-
-
-    query = f"""
-                SELECT bu.last_update_time, bu.email, bu.balance FROM crmdb.broker_user as bu
-                WHERE bu.last_update_time >= NOW() - INTERVAL 5 MINUTE
-                        ORDER BY bu.last_update_time DESC;
-            """
+    # # if not data:
+    # #     print("[INFO] No transactions found in last 30 minutes")
+    # #     return
     
-    try:
-        data = DBConnection._forFetchingJson(query, using='replica')
-        data_df = pd.DataFrame(data)
-    except Exception as e:
-        print(f"[ERROR] DB fetch failed: {e}")
-        return
+    # for transaction in data:
+    #     try:
+    #         email = transaction.get('email')
+    #         margin_level_stored = transaction.get('margin_level_stored', 0.0)
+    #         equity = transaction.get('equity')
+    #         balance = transaction.get('balance')/100
+
+    #         if can_send_low_margin_today(email):
+    #             timestamp = current_webengage_time(
+    #                 datetime.now(timezone.utc),
+    #                 offset_hours=-8
+    #             )
+
+    #             res = low_margin(
+    #                 user_id=email,
+    #                 account_balance=balance,
+    #                 equity=equity,
+    #                 margin_level=int(margin_level_stored),
+    #                 timestamp=timestamp
+    #             )
+    #             print("[SUCCESS] low_margin:", res)
+
+    #             # Save notification record
+    #             LowMarginNotifiedRec.objects.create(email=email)
+    #         else:
+    #             print(f"[SKIP] Low margin already sent today for {email}")
+    #     except Exception as e:
+    #         print(f"[ERROR] Failed processing transaction {transaction}: {e}")
+
+
+    # query = f"""
+    #             SELECT bu.last_update_time, bu.email, bu.balance FROM crmdb.broker_user as bu
+    #             WHERE bu.last_update_time >= NOW() - INTERVAL 5 MINUTE
+    #                     ORDER BY bu.last_update_time DESC;
+    #         """
     
-    # if not data:
-    #     print("[INFO] No transactions found in last 5 minutes")
+    # try:
+    #     data = DBConnection._forFetchingJson(query, using='replica')
+    #     data_df = pd.DataFrame(data)
+    # except Exception as e:
+    #     print(f"[ERROR] DB fetch failed: {e}")
     #     return
     
-    balance_emails = set(data_df['email'])
-    for email in balance_emails:
-        temp_query = f"""
-                            SELECT
-                                bu.email,
-                                SUM(bu.balance) AS total_balance
-                            FROM crmdb.broker_user AS bu
-                            WHERE bu.email = '{email}'
-                            GROUP BY bu.email;
-                        """
-        temp_data = DBConnection._forFetchingJson(temp_query, using='replica')
-        email = temp_data[0].get('email')
-        total_balance = temp_data[0].get('total_balance')
-        res = upsert_user(
-                user_id=email,
-                attributes={
-                    'Balance': int(total_balance)/100
-                }
-            )
-        print("[SUCCESS] last_trade:", res, email, int(total_balance))
+    # # if not data:
+    # #     print("[INFO] No transactions found in last 5 minutes")
+    # #     return
+    
+    # balance_emails = set(data_df['email'])
+    # for email in balance_emails:
+    #     temp_query = f"""
+    #                         SELECT
+    #                             bu.email,
+    #                             SUM(bu.balance) AS total_balance
+    #                         FROM crmdb.broker_user AS bu
+    #                         WHERE bu.email = '{email}'
+    #                         GROUP BY bu.email;
+    #                     """
+    #     temp_data = DBConnection._forFetchingJson(temp_query, using='replica')
+    #     email = temp_data[0].get('email')
+    #     total_balance = temp_data[0].get('total_balance')
+    #     res = upsert_user(
+    #             user_id=email,
+    #             attributes={
+    #                 'Balance': int(total_balance)/100
+    #             }
+    #         )
+    #     print("[SUCCESS] last_trade:", res, email, int(total_balance))
 
 

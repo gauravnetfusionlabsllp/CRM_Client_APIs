@@ -43,7 +43,7 @@ from apps.users.helper.extractai import *
 from apps.users.serializers import *
 from apps.core.telegram_api import *
 from apps.core.WebEngage import *
-
+timestamp = current_webengage_time(offset_hours=-8)
 
 import mysql.connector
 
@@ -296,7 +296,7 @@ class Match2PayPayIn(APIView):
                 print(serializer.errors)
 
         except Exception as e:
-            print("ERROR in Match2PayPayIn: ", str(e))
+            logger.error(f"ERROR in Match2PayPayIn: {str(e)}", exc_info=True)
         return JsonResponse(response, status=status.HTTP_200_OK)
 
 crm_api = CRM()
@@ -575,7 +575,7 @@ class WithdrawalRequest(APIView):
                                 method=psp_method,
                                 pspId=psp_id
                             )
-                        print(crmRes, '----------------------------- 44')
+                        logger.error(f"First Approval{crmRes}", exc_info=True)
                         response['reason'] = str("Transaction approved.")
                     else:
                         crmRes = crm_api.cancel_withdrawal(approval.brokerBankingId)
@@ -647,6 +647,7 @@ class WithdrawalRequest(APIView):
                             print("withdrawal_failed failed")
 
                         crmRes = crm_api.cancel_withdrawal(approval.brokerBankingId)
+                        logger.error(f"Second Approval{crmRes} action: {action}", exc_info=True)
                         # print("crmRes", crmRes)
                         if not crmRes.get("success"):
                             response['errorcode'] = status.HTTP_400_BAD_REQUEST
@@ -689,6 +690,7 @@ class WithdrawalRequest(APIView):
                             return Response(response, status=400)
                         try:
                             psp_response = psp.payout(approval, finalInrAmount)
+                            logger.error(f"Second Approval PSP Response{psp_response} action: {action}", exc_info=True)
                             print("PSP Response:", psp_response)
                             if isinstance(psp_response, dict) and psp_response.get("success") is True or psp_response.get('msg') == "success":
                                 response_message["psp_payout"] = "Payout Successful!"
@@ -1057,7 +1059,7 @@ class JenaPayPayIn(APIView):
             return Response(response, response.get('httpstatus'))
 
         except Exception as e:
-            print(f"Error in JenaPayPayIn: {str(e)}")
+            logger.error(f"Error in JenaPayPayIn: {str(e)}", exc_info=True)
             response['status'] = 'error'
             response['errorcode'] = status.HTTP_400_BAD_REQUEST
             response['reason'] = str(e)
@@ -1261,7 +1263,7 @@ class CheezeePayUPIPayIN(APIView):
             return Response(response, status=response["httpstatus"])
 
         except Exception as e:
-            print(f"Error in CheezeePay Pay In: {str(e)}")
+            logger.error(f"Error in CheezeePay Pay In: {str(e)}", exc_info=True)
             response.update({
                 "status": "error",
                 "errorcode": status.HTTP_400_BAD_REQUEST,

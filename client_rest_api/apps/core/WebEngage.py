@@ -57,7 +57,6 @@ def track_event(user_id, event_name, event_time=None, event_data=None):
     payload = {"userId": user_id, "eventName": event_name}
     if event_time: payload["eventTime"] = event_time
     if event_data: payload["eventData"] = event_data
-    print('-------------- 01')
     return _post_request(url, payload)
 
 # -------------------- User Upsert --------------------
