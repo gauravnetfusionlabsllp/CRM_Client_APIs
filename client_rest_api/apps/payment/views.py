@@ -1746,7 +1746,7 @@ class SendWithdrawalRequestOTP(APIView):
                     WHERE u.email = (
                         SELECT bu.email
                         FROM crmdb.broker_user AS bu
-                        WHERE bu.id = {int(brokerUserId)} )"""
+                        WHERE bu.user_id = {int(userId)} and bu.id = {int(brokerUserId)} )"""
 
             userData = DBConnection._forFetchingJson(query, using='replica')
             if not userData:
@@ -1765,9 +1765,9 @@ class SendWithdrawalRequestOTP(APIView):
 
             if res:
                 withdrawalObj = WithdrawalApprovals.objects.create(
-                    userId = data.get('user_id'),
+                    userId = userId,
                     brokerUserId = data.get('brokerUserId'),
-                    email = data.get('email'),
+                    email = userData.get('email'),
                     amount = data.get('amount'),
                     walletAddress = data.get('walletAddress'),
                     currency = data.get('currency'),
@@ -1787,9 +1787,9 @@ class SendWithdrawalRequestOTP(APIView):
                 logger.error(f"Client OTP Email: {email}")
                 resEmail = generate_and_send_otp(email)
                 withdrawalObj = WithdrawalApprovals.objects.create(
-                    userId = data.get('user_id'),
+                    userId = userId,
                     brokerUserId = data.get('brokerUserId'),
-                    email = data.get('email'),
+                    email = userData.get('email'),
                     amount = data.get('amount'),
                     walletAddress = data.get('walletAddress'),
                     currency = data.get('currency'),
