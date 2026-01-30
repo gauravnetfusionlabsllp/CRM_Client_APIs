@@ -13,6 +13,12 @@ CRM_MANUAL_WITHDRAWAL_CANCEL_URL = os.environ.get("CRM_MANUAL_WITHDRAWAL_CANCEL_
 CRM_MANUAL_WITHDRAWAL_UPDATE_URL = os.environ.get("CRM_MANUAL_WITHDRAWAL_UPDATE_URL")
 CRM_GET_TRANSACTIONS_URL = os.environ.get("CRM_GET_TRANSACTIONS_URL")
 
+import logging
+import logging.config
+from django.conf import settings
+logging.config.dictConfig(settings.LOGGING)
+logger = logging.getLogger('custom_logger')
+
 headers = {
     "Content-Type": "application/json",
     "x-crm-api-token": str(CRM_AUTH_TOKEN)
@@ -85,11 +91,11 @@ class CRM:
                 print("Withdrawal request sent successfully!")
                 return response.json()
             else:
-                print(f"Error: {response.status_code}")
+                logger.error(f"Error: {response}", exc_info=True)
                 print(response.text)
                 return {'success': False }
         except Exception as e:
-            print(f"Exception occurred: {e}")
+            logger.error(f"Exception occurred: {e}", exc_info=True)
             return {'success': False }
     
     def verify_withdrawal(self, withdrawalID, method, pspId):
