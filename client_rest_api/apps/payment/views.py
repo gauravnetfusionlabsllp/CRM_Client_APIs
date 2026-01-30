@@ -393,16 +393,15 @@ class WithdrawalRequest(APIView):
             response = {"status": "success", "errorcode": "", "reason": "", "result":"", "httpstatus": status.HTTP_200_OK}
             __data = request.data.get('data')
             withdrawalId  = request.data.get('withdrawalId')
-            print('--------------------02')
-
-
+            user_id = request.session_user
+        
             if not withdrawalId:
                 response['status'] = "error"
                 response['errorcode'] = status.HTTP_400_BAD_REQUEST
                 response['reason'] = "Withdrawal Id is required!!"
             try:
                 print('--------------------03')
-                withObj = WithdrawalApprovals.objects.get(id=int(withdrawalId))
+                withObj = WithdrawalApprovals.objects.get(id=int(withdrawalId), userId=user_id)
                 print('--------------------04')
             except WithdrawalApprovals.DoesNotExist:
                 response = {
@@ -413,17 +412,18 @@ class WithdrawalRequest(APIView):
                 }
                 return Response(response, status=response['httpstatus'])
             
-            if not withObj.otpVerified:
+            if not withObj.otpVerified or not withObj.brokerUserId:
                 response['status'] = 'error'
                 response['errorcode'] = status.HTTP_400_BAD_REQUEST
                 response['reason'] = "Withdrawal Request is not Verified !!"
                 response['httpstatus'] = status.HTTP_400_BAD_REQUEST
                 return Response(response, status=response.get('httpstatus'))
 
-            user_id = request.session_user
             
             # user_id = __data.get('user_id')
             __data["userId"] = user_id
+            __data["brokerUserId"] = withObj.brokerUserId
+            print(__data)
             if __data:
                 print('--------------------01')
                 crmRes = crm_api.initial_withdrawal(__data)
@@ -441,7 +441,7 @@ class WithdrawalRequest(APIView):
                         "userId" :  user_id,
                         "full_name" : __data.get('full_name', "test"),
                         "email" : __data["email"],
-                        "brokerUserId" : __data["brokerUserId"],
+                        "brokerUserId" : withObj.brokerUserId,
                         "transactionId" : crmRes.get("result").get("id"),
                         "amount" : __data["amount"] if __data.get("pspName") == "cheezepay" else __data["amount"],
                         "order_type" : "withdrawal",
@@ -496,7 +496,9 @@ class WithdrawalRequest(APIView):
                     response['reason'] = str(serializer.errors)
                     response['httpstatus'] = status.HTTP_400_BAD_REQUEST
             return Response(response, status=response.get('httpstatus'))
+        
         except Exception as e:
+            logger.error(f"Error in the Withdrawal request: {str(e)}", exc_info=True)
             response['status'] = 'error'
             response['errorcode'] = status.HTTP_400_BAD_REQUEST
             response['reason'] = str(e)
