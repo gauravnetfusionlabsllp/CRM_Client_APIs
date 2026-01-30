@@ -1731,8 +1731,22 @@ class SendWithdrawalRequestOTP(APIView):
 
             data = request.data.get('data')
             isCall = int(data.get('isCall', 0))
+            brokerUserId = data.get('brokerUserId')
+
+            if not brokerUserId:
+                response['status'] = 'error'
+                response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                response['reason'] = 'Broker User Id Does Not Exist!!!'
+                response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                return Response(response, status=response.get('httpstatus'))
+            
             userId = request.session_user
-            query = f"""SELECT u.telephone_prefix, u.telephone, u.email FROM crmdb.users AS u where u.id = {int(userId)}"""
+            query = f"""SELECT u.telephone_prefix, u.telephone, u.email
+                    FROM crmdb.users AS u
+                    WHERE u.email = (
+                        SELECT bu.email
+                        FROM crmdb.broker_user AS bu
+                        WHERE bu.id = {int(brokerUserId)} )"""
 
             userData = DBConnection._forFetchingJson(query, using='replica')
             if not userData:
@@ -1743,9 +1757,10 @@ class SendWithdrawalRequestOTP(APIView):
                 return Response(response, status=response.get('httpstatus'))
 
             userData = userData[0]
+            logger.error(f"userData OTP Request: {userData}")
             formatNumber = str(userData.get('telephone_prefix'))+ str(userData.get('telephone'))
 
-            print(formatNumber, "-----------------------150")
+            logger.error(f"Formatted Num : {formatNumber}")
             res = send_text_message(formatNumber, isCall)
 
             if res:
@@ -1769,6 +1784,7 @@ class SendWithdrawalRequestOTP(APIView):
             
             else:
                 email = userData.get('email')
+                logger.error(f"Client OTP Email: {email}")
                 resEmail = generate_and_send_otp(email)
                 withdrawalObj = WithdrawalApprovals.objects.create(
                     userId = data.get('user_id'),
@@ -1795,7 +1811,7 @@ class SendWithdrawalRequestOTP(APIView):
             return Response(response, status=response.get('httpstatus'))
 
         except Exception as e:
-            print(f"Error in the Sending the withdrawal request OTP: {str(e)}")
+            logger.error(f"Error in the Sending the withdrawal request OTP: {str(e)}")
             response['status'] = 'error'
             response['errorcode'] = status.HTTP_400_BAD_REQUEST
             response['reason'] = str(e)
