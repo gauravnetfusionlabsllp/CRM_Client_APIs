@@ -393,9 +393,7 @@ class WithdrawalRequest(APIView):
             response = {"status": "success", "errorcode": "", "reason": "", "result":"", "httpstatus": status.HTTP_200_OK}
             __data = request.data.get('data')
             withdrawalId  = request.data.get('withdrawalId')
-            print('--------------------02')
-
-
+        
             if not withdrawalId:
                 response['status'] = "error"
                 response['errorcode'] = status.HTTP_400_BAD_REQUEST
@@ -421,7 +419,20 @@ class WithdrawalRequest(APIView):
                 return Response(response, status=response.get('httpstatus'))
 
             user_id = request.session_user
-            
+            query = f"""SELECT *
+                        FROM crmdb.broker_user AS bu
+                        WHERE bu.user_id = {int(user_id)} and bu.id = {int(__data["brokerUserId"])}"""
+
+            userData = DBConnection._forFetchingJson(query, using='replica')
+
+            if not userData:
+                logger.error(f"No User with this broker Id: {userData}", exc_info=True)
+                response['status'] = 'error'
+                response['errorcode'] = status.HTTP_400_BAD_REQUEST
+                response['reason'] = "Withdrawal Request is not Verified !!"
+                response['httpstatus'] = status.HTTP_400_BAD_REQUEST
+                return Response(response, status=response.get('httpstatus'))
+
             # user_id = __data.get('user_id')
             __data["userId"] = user_id
             if __data:
@@ -496,7 +507,9 @@ class WithdrawalRequest(APIView):
                     response['reason'] = str(serializer.errors)
                     response['httpstatus'] = status.HTTP_400_BAD_REQUEST
             return Response(response, status=response.get('httpstatus'))
+        
         except Exception as e:
+            logger.error(f"Error in the Withdrawal request: {str(e)}", exc_info=True)
             response['status'] = 'error'
             response['errorcode'] = status.HTTP_400_BAD_REQUEST
             response['reason'] = str(e)
